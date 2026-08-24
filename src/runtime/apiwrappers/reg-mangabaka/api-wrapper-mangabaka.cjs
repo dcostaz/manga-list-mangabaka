@@ -750,23 +750,38 @@ class MangaBakaAPIWrapper {
   }
 
   /**
-   * Two modes per host-capability-contract.md §2's enrich.cover mapping:
-   * query mode (title search, own fuzzy pick of the top result) and id mode
-   * (options.pluginEntryId present — skip search, fetch the known entry's cover).
-   * @param {string} query
-   * @param {{ pluginEntryId?: string, forceRefresh?: boolean }} [options]
+   * Two modes per host-capability-contract.md §2's enrich.cover mapping: query mode
+   * (title search, own pick of the top result) and id mode (a known id present —
+   * skip search, fetch the known entry's cover directly).
+   *
+   * The real host caller, `CoverSearchOrchestrator` (`cls/coversearch/coversearchorchestrator.cjs`,
+   * not yet migrated off its pre-capability-vocabulary calling convention), passes a full
+   * LocalTracker-like entry object as the first argument — not a bare query string — and carries
+   * the known id (when this entry is already linked to this tracker) as `options.trackerId`, not
+   * `options.pluginEntryId`. This accepts both that real convention and the documented one, so it
+   * works whether called by the current host or a future one that adopts the documented shape.
+   * @param {string | { title?: string }} mangaCoreEntryOrQuery
+   * @param {{ trackerId?: string, pluginEntryId?: string, searchTitles?: string[], forceRefresh?: boolean }} [options]
    * @returns {Promise<PluginCoverResult[]>}
    */
-  async searchCovers(query, options = {}) {
-    const pluginEntryId = options && typeof options === 'object' ? options.pluginEntryId : null;
+  async searchCovers(mangaCoreEntryOrQuery, options = {}) {
+    const opts = options && typeof options === 'object' ? options : {};
+    const knownId = opts.trackerId || opts.pluginEntryId || null;
 
     let raw = null;
-    if (pluginEntryId) {
-      raw = await this._fetchSeriesDetail(pluginEntryId);
+    if (knownId) {
+      raw = await this._fetchSeriesDetail(knownId);
     } else {
-      const q = typeof query === 'string' ? query.trim() : '';
+      const searchTitles = Array.isArray(opts.searchTitles)
+        ? opts.searchTitles.filter((title) => typeof title === 'string' && title.trim())
+        : [];
+      const q = searchTitles.length > 0
+        ? searchTitles[0]
+        : typeof mangaCoreEntryOrQuery === 'string'
+          ? mangaCoreEntryOrQuery.trim()
+          : (mangaCoreEntryOrQuery && typeof mangaCoreEntryOrQuery.title === 'string' ? mangaCoreEntryOrQuery.title.trim() : '');
       if (!q) return [];
-      const matches = await this.search(q, { forceRefresh: options && options.forceRefresh });
+      const matches = await this.search(q, { forceRefresh: opts.forceRefresh });
       if (!matches.length) return [];
       raw = await this._fetchSeriesDetail(matches[0].pluginEntryId);
     }
@@ -789,11 +804,19 @@ class MangaBakaAPIWrapper {
   /**
    * Returns the cover image as a raw Buffer — never writes to disk itself,
    * per tracker-template.md §4.3's data-boundary discipline.
-   * @param {string} coverId - the MangaBaka series id, as returned by searchCovers().
+   *
+   * `coverId` is the MangaBaka series id as returned by `searchCovers()`'s own `coverId` field —
+   * but the real host caller, `ImageService._invokeProviderDownload()`
+   * (`cls/services/imageservice.cjs:456`), constructs it as `${sourceId}/${fileName}` (a bridging
+   * convention borrowed from the pre-existing MangaUpdates plugin, not something MangaBaka's own
+   * `coverId` ever contains a `/` in). Splitting on `/` and taking the first segment handles both.
+   * @param {string} coverId
    * @returns {Promise<Buffer>}
    */
   async downloadCover(coverId) {
-    const seriesId = Number(coverId);
+    const rawCoverId = typeof coverId === 'string' ? coverId : String(coverId || '');
+    const seriesIdPart = rawCoverId.includes('/') ? rawCoverId.split('/')[0] : rawCoverId;
+    const seriesId = Number(seriesIdPart);
     if (!Number.isFinite(seriesId) || seriesId <= 0) {
       throw new Error('(downloadCover) Invalid coverId');
     }

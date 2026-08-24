@@ -178,6 +178,35 @@ test('searchCovers - query mode searches then fetches the top result cover', asy
   assert.equal(covers[0].coverId, '1');
 });
 
+test('searchCovers - accepts CoverSearchOrchestrator\'s real calling convention: a full entry object plus options.trackerId', async () => {
+  const { client, hooks } = createMockHttpClient();
+  hooks.getHandler = (url) => (url.includes('/series/1') ? { data: { status: 200, data: DICE_SERIES } } : { data: null });
+
+  const wrapper = await createWrapper(client);
+  // cls/coversearch/coversearchorchestrator.cjs:314 calls wrapper.searchCovers(fullEntry, wrapperOptions)
+  // with a LocalTracker-like object as the first arg and the known id as options.trackerId, not a
+  // bare query string / options.pluginEntryId.
+  const covers = await wrapper.searchCovers({ uuid: 'lt-1', title: 'DICE' }, { trackerId: '1', searchTitles: ['DICE'] });
+
+  assert.equal(covers.length, 1);
+  assert.equal(covers[0].coverId, '1');
+});
+
+test('searchCovers - query mode with a full entry object and no known id falls back to options.searchTitles then entry.title', async () => {
+  const { client, hooks } = createMockHttpClient();
+  hooks.getHandler = (url) => {
+    if (url.includes('/series/search')) return { data: { status: 200, pagination: {}, data: [DICE_SERIES] } };
+    if (url.includes('/series/1')) return { data: { status: 200, data: DICE_SERIES } };
+    return { data: null };
+  };
+
+  const wrapper = await createWrapper(client);
+  const covers = await wrapper.searchCovers({ uuid: 'lt-1', title: 'DICE' }, { searchTitles: ['DICE'] });
+
+  assert.equal(covers.length, 1);
+  assert.equal(covers[0].coverId, '1');
+});
+
 test('downloadCover - returns a Buffer and never writes to disk itself', async () => {
   const { client, hooks } = createMockHttpClient();
   const fakeBytes = Buffer.from('fake-image-bytes');
@@ -189,6 +218,23 @@ test('downloadCover - returns a Buffer and never writes to disk itself', async (
 
   const wrapper = await createWrapper(client);
   const buffer = await wrapper.downloadCover('1');
+
+  assert.ok(Buffer.isBuffer(buffer));
+  assert.equal(buffer.toString(), 'fake-image-bytes');
+});
+
+test('downloadCover - accepts ImageService\'s real "${seriesId}/${fileName}" bridging convention', async () => {
+  const { client, hooks } = createMockHttpClient();
+  const fakeBytes = Buffer.from('fake-image-bytes');
+  hooks.getHandler = (url) => {
+    if (url.includes('/series/1')) return { data: { status: 200, data: DICE_SERIES } };
+    if (url === 'https://images.mangabaka.dev/full.jpg') return { data: fakeBytes };
+    return { data: null };
+  };
+
+  const wrapper = await createWrapper(client);
+  // cls/services/imageservice.cjs:456 constructs coverId as `${sourceId}/${metadata.fileName}`.
+  const buffer = await wrapper.downloadCover('1/cover.jpg');
 
   assert.ok(Buffer.isBuffer(buffer));
   assert.equal(buffer.toString(), 'fake-image-bytes');

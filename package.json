@@ -1,0 +1,30 @@
+{
+  "name": "manga-list-mangabaka",
+  "version": "1.0.0",
+  "description": "Runtime tracker package source and builder for MangaBaka",
+  "main": "src/runtime/apiwrappers/reg-mangabaka/plugin-module.cjs",
+  "scripts": {
+    "build": "node scripts/build-runtime-plugin-package.cjs",
+    "build:runtime": "node scripts/build-runtime-plugin-package.cjs",
+    "test": "node --test tests/unit/*.test.cjs",
+    "typecheck": "tsc --noEmit",
+    "test:search:interactive": "node scripts/run-search-integration-test.cjs",
+    "test:library:interactive": "node scripts/run-library-integration-test.cjs"
+  },
+  "keywords": [
+    "manga",
+    "mangabaka",
+    "tracker"
+  ],
+  "author": "dcostaz",
+  "license": "MIT",
+  "dependencies": {
+    "archiver": "^7.0.1",
+    "jszip": "^3.10.1"
+  },
+  "devDependencies": {
+    "@types/archiver": "^6.0.2",
+    "@types/node": "^26.0.0",
+    "typescript": "^6.0.3"
+  }
+}

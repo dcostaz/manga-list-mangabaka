@@ -1,0 +1,107 @@
+{
+  "metadata": {
+    "componentName": "MangaBakaAPI",
+    "description": "MangaBaka runtime tracker package settings values (tracker-specific extension)",
+    "version": "1.0.0",
+    "lastModified": "2026-08-23T00:00:00.000Z",
+    "lifecycle": {
+      "bootstrapPhase": "early",
+      "dependencies": [],
+      "requiredBy": []
+    },
+    "categories": [
+      {
+        "id": "display",
+        "label": "Display & UI",
+        "description": "User interface and display options",
+        "order": 50,
+        "icon": "visibility"
+      },
+      {
+        "id": "general",
+        "label": "General",
+        "description": "Basic configuration options",
+        "order": 10,
+        "icon": "settings"
+      },
+      {
+        "id": "network",
+        "label": "Network & API",
+        "description": "Network connections and external API configuration",
+        "order": 40,
+        "icon": "cloud"
+      },
+      {
+        "id": "performance",
+        "label": "Performance & Caching",
+        "description": "Performance tuning and caching configuration",
+        "order": 30,
+        "icon": "speed"
+      }
+    ],
+    "settingsContractVersion": "1.0.0"
+  },
+  "settings": {
+    "api.baseUrl": "https://api.mangabaka.org/v1",
+    "api.authBaseUrl": "https://mangabaka.org/auth",
+    "api.endpoints.token.template": "${authBaseUrl}/oauth2/token",
+    "api.endpoints.token.throttle": 0,
+    "api.endpoints.seriesDetail.template": "${baseUrl}/series/${series_id}",
+    "api.endpoints.seriesDetail.throttle": 400,
+    "api.endpoints.seriesSearch.template": "${baseUrl}/series/search",
+    "api.endpoints.seriesSearch.throttle": 2100,
+    "api.endpoints.myLibrary.template": "${baseUrl}/my/library",
+    "api.endpoints.myLibrary.throttle": 400,
+    "api.endpoints.myLibraryEntry.template": "${baseUrl}/my/library/${series_id}",
+    "api.endpoints.myLibraryEntry.throttle": 400,
+    "oauth.scope": "library.read library.write",
+    "ui.label": "MangaBaka",
+    "ui.icon": "images/mangabaka-icon.svg",
+    "ui.credentialsTemplate": [
+      {
+        "key": "client_id",
+        "label": "Client ID",
+        "type": "text",
+        "required": true,
+        "description": "OAuth2 client ID from a personal API client registered at mangabaka.org."
+      },
+      {
+        "key": "client_secret",
+        "label": "Client Secret",
+        "type": "password",
+        "required": true,
+        "description": "OAuth2 client secret for the registered client, used with the client_credentials grant."
+      }
+    ],
+    "connection.timeout.connect": 5000,
+    "connection.timeout.request": 30000,
+    "connection.timeout.search": 30000,
+    "connection.pool.maxSockets": 10,
+    "connection.pool.maxFreeSockets": 5,
+    "connection.pool.keepAlive": true,
+    "retry.enabled": true,
+    "retry.maxAttempts": 3,
+    "retry.backoff.type": "exponential",
+    "retry.backoff.initialDelay": 1000,
+    "retry.backoff.maxDelay": 10000,
+    "retry.backoff.multiplier": 2,
+    "retry.retryableErrors": ["ETIMEDOUT", "ECONNRESET", "ECONNREFUSED", 502, 503, 504, 429],
+    "cache.enabled": true,
+    "cache.provider": "memory",
+    "cache.ttl.seriesMetadata": 86400,
+    "cache.ttl.searchResults": 3600,
+    "cache.ttl.library": 1800,
+    "cache.ttl.accessTokenFallback": 3300,
+    "cache.ttl.coverUrls": 604800,
+    "cache.ttl.default": 3600,
+    "rateLimit.global.enabled": true,
+    "rateLimit.global.maxConcurrent": 5,
+    "rateLimit.global.maxPerMinute": 170,
+    "rateLimit.perEndpoint.enabled": true,
+    "rateLimit.perEndpoint.defaultDelay": 400,
+    "resilience.circuitBreaker.enabled": false,
+    "resilience.circuitBreaker.failureThreshold": 5,
+    "resilience.circuitBreaker.failureWindow": 10000,
+    "resilience.circuitBreaker.openDuration": 30000
+  }
+}

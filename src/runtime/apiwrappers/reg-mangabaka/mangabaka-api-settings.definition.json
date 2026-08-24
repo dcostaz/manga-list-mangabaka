@@ -1,0 +1,560 @@
+{
+  "metadata": {
+    "componentName": "MangaBakaAPI",
+    "description": "MangaBaka runtime tracker package settings definition (tracker-specific extension)",
+    "version": "1.0.0",
+    "lastModified": "2026-08-23T00:00:00.000Z",
+    "lifecycle": {
+      "bootstrapPhase": "early",
+      "dependencies": [],
+      "requiredBy": []
+    },
+    "categories": [
+      {
+        "id": "general",
+        "label": "Tracker Identity & Protocol",
+        "description": "Tracker display identity, authentication, and status protocol values",
+        "order": 10,
+        "icon": "settings"
+      },
+      {
+        "id": "network",
+        "label": "Network & API",
+        "description": "Connection settings and API endpoint reference",
+        "order": 20,
+        "icon": "cloud"
+      },
+      {
+        "id": "performance",
+        "label": "Performance & Reliability",
+        "description": "Caching, rate limiting, retry, and resilience configuration",
+        "order": 30,
+        "icon": "speed"
+      }
+    ],
+    "settingsContractVersion": "1.0.0"
+  },
+  "schema": {
+    "api.baseUrl": {
+      "type": "string",
+      "required": true,
+      "default": "https://api.mangabaka.org/v1",
+      "description": "Base URL for the MangaBaka public data API",
+      "validation": { "pattern": "^https://" },
+      "readOnly": true,
+      "isBasic": false,
+      "category": "network",
+      "order": 200
+    },
+    "api.authBaseUrl": {
+      "type": "string",
+      "required": true,
+      "default": "https://mangabaka.org/auth",
+      "description": "Base URL for MangaBaka's OAuth2/OIDC authorization server (separate host from api.baseUrl, per https://mangabaka.org/.well-known/openid-configuration)",
+      "validation": { "pattern": "^https://" },
+      "readOnly": true,
+      "isBasic": false,
+      "category": "network",
+      "order": 205
+    },
+    "api.endpoints.token.template": {
+      "type": "string",
+      "required": true,
+      "default": "${authBaseUrl}/oauth2/token",
+      "description": "OAuth2 token endpoint (client_credentials grant)",
+      "readOnly": true,
+      "isBasic": false,
+      "category": "network",
+      "order": 210
+    },
+    "api.endpoints.token.throttle": {
+      "type": "number",
+      "required": false,
+      "default": 0,
+      "description": "Minimum delay between token requests (milliseconds)",
+      "validation": { "min": 0, "max": 60000 },
+      "readOnly": true,
+      "isBasic": false,
+      "category": "performance",
+      "order": 710
+    },
+    "api.endpoints.seriesDetail.template": {
+      "type": "string",
+      "required": true,
+      "default": "${baseUrl}/series/${series_id}",
+      "description": "Endpoint to get full series details by ID (public, no auth required)",
+      "readOnly": true,
+      "isBasic": false,
+      "category": "network",
+      "order": 220
+    },
+    "api.endpoints.seriesDetail.throttle": {
+      "type": "number",
+      "required": false,
+      "default": 400,
+      "description": "Minimum delay between series-detail requests (milliseconds) - MangaBaka's default rate limit is 180 req/min",
+      "readOnly": true,
+      "isBasic": false,
+      "category": "performance",
+      "order": 720
+    },
+    "api.endpoints.seriesSearch.template": {
+      "type": "string",
+      "required": true,
+      "default": "${baseUrl}/series/search",
+      "description": "Endpoint to search series by title (public, no auth required)",
+      "readOnly": true,
+      "isBasic": false,
+      "category": "network",
+      "order": 230
+    },
+    "api.endpoints.seriesSearch.throttle": {
+      "type": "number",
+      "required": false,
+      "default": 2100,
+      "description": "Minimum delay between search requests (milliseconds) - MangaBaka's search rate limit is 30 req/min",
+      "readOnly": true,
+      "isBasic": false,
+      "category": "performance",
+      "order": 730
+    },
+    "api.endpoints.myLibrary.template": {
+      "type": "string",
+      "required": true,
+      "default": "${baseUrl}/my/library",
+      "description": "ASSUMPTION (unverified — see docs/plugins/mangabaka/architecture.md): endpoint to list/read the authenticated user's full library. Confirmed to exist (returns 401 unauthenticated); exact response shape not yet verified against a real account.",
+      "readOnly": true,
+      "isBasic": false,
+      "category": "network",
+      "order": 240
+    },
+    "api.endpoints.myLibrary.throttle": {
+      "type": "number",
+      "required": false,
+      "default": 400,
+      "description": "Minimum delay between my-library requests (milliseconds)",
+      "readOnly": true,
+      "isBasic": false,
+      "category": "performance",
+      "order": 740
+    },
+    "api.endpoints.myLibraryEntry.template": {
+      "type": "string",
+      "required": true,
+      "default": "${baseUrl}/my/library/${series_id}",
+      "description": "ASSUMPTION (unverified): endpoint to get/add/update/remove a single library entry by series id. Not directly confirmed live — modeled on the collection endpoint's own path plus REST convention. Correct via scripts/run-library-integration-test.cjs before relying on it.",
+      "readOnly": true,
+      "isBasic": false,
+      "category": "network",
+      "order": 250
+    },
+    "api.endpoints.myLibraryEntry.throttle": {
+      "type": "number",
+      "required": false,
+      "default": 400,
+      "description": "Minimum delay between single-library-entry requests (milliseconds)",
+      "readOnly": true,
+      "isBasic": false,
+      "category": "performance",
+      "order": 750
+    },
+    "oauth.scope": {
+      "type": "string",
+      "required": true,
+      "default": "library.read library.write",
+      "description": "Space-separated OAuth2 scopes requested on the client_credentials token request, per MangaBaka's OIDC discovery document",
+      "readOnly": true,
+      "isBasic": false,
+      "category": "general",
+      "order": 45
+    },
+    "ui.label": {
+      "type": "string",
+      "required": true,
+      "default": "MangaBaka",
+      "description": "Display label for UI",
+      "readOnly": true,
+      "isBasic": false,
+      "category": "general",
+      "order": 10
+    },
+    "ui.icon": {
+      "type": "string",
+      "required": true,
+      "default": "images/mangabaka-icon.svg",
+      "description": "Path to icon image",
+      "readOnly": true,
+      "isBasic": false,
+      "category": "general",
+      "order": 20
+    },
+    "ui.credentialsTemplate": {
+      "type": "array",
+      "required": true,
+      "default": [
+        {
+          "key": "client_id",
+          "label": "Client ID",
+          "type": "text",
+          "required": true,
+          "description": "OAuth2 client ID from a personal API client registered at mangabaka.org."
+        },
+        {
+          "key": "client_secret",
+          "label": "Client Secret",
+          "type": "password",
+          "required": true,
+          "description": "OAuth2 client secret for the registered client, used with the client_credentials grant."
+        }
+      ],
+      "description": "Credential template definition for tracker auth prompts",
+      "readOnly": true,
+      "isBasic": false,
+      "category": "general",
+      "order": 30
+    },
+    "credentials.primary": {
+      "type": "credential",
+      "required": false,
+      "default": null,
+      "label": "MangaBaka Credentials",
+      "description": "Securely store the MangaBaka OAuth2 client_id/client_secret used by the tracker wrapper's client_credentials grant.",
+      "helpText": "Opens the encrypted credential modal so operators can set the MangaBaka API client credentials directly from the Trackers settings tab.",
+      "isBasic": true,
+      "readOnly": false,
+      "implementationStatus": "implemented",
+      "category": "general",
+      "order": 40,
+      "tags": ["credentials", "tracker", "security"],
+      "uiHints": {
+        "widget": "credential",
+        "serviceName": "mangabaka",
+        "credentialType": "tracker",
+        "credentialKeys": ["client_id", "client_secret"]
+      }
+    },
+    "connection.timeout.connect": {
+      "type": "number",
+      "required": true,
+      "default": 5000,
+      "description": "TCP connection timeout in milliseconds",
+      "validation": { "min": 1000, "max": 30000 },
+      "readOnly": false,
+      "isBasic": false,
+      "category": "network",
+      "order": 10
+    },
+    "connection.timeout.request": {
+      "type": "number",
+      "required": true,
+      "default": 30000,
+      "description": "Total request timeout in milliseconds",
+      "validation": { "min": 5000, "max": 300000 },
+      "readOnly": false,
+      "isBasic": false,
+      "category": "network",
+      "order": 20
+    },
+    "connection.timeout.search": {
+      "type": "number",
+      "required": true,
+      "default": 30000,
+      "description": "Search request timeout in milliseconds",
+      "validation": { "min": 10000, "max": 300000 },
+      "readOnly": false,
+      "isBasic": false,
+      "category": "network",
+      "order": 30
+    },
+    "connection.pool.maxSockets": {
+      "type": "number",
+      "required": true,
+      "default": 10,
+      "description": "Maximum concurrent connections to API",
+      "validation": { "min": 1, "max": 50 },
+      "readOnly": false,
+      "isBasic": false,
+      "category": "network",
+      "order": 50
+    },
+    "connection.pool.maxFreeSockets": {
+      "type": "number",
+      "required": true,
+      "default": 5,
+      "description": "Maximum idle connections in pool",
+      "validation": { "min": 0, "max": 25 },
+      "readOnly": false,
+      "isBasic": false,
+      "category": "network",
+      "order": 60
+    },
+    "connection.pool.keepAlive": {
+      "type": "boolean",
+      "required": true,
+      "default": true,
+      "description": "Enable keep-alive for connection reuse",
+      "readOnly": false,
+      "isBasic": false,
+      "category": "network",
+      "order": 40
+    },
+    "retry.enabled": {
+      "type": "boolean",
+      "required": true,
+      "default": true,
+      "description": "Enable automatic retry on transient failures",
+      "readOnly": false,
+      "isBasic": false,
+      "category": "performance",
+      "order": 300
+    },
+    "retry.maxAttempts": {
+      "type": "number",
+      "required": true,
+      "default": 3,
+      "description": "Maximum retry attempts before giving up",
+      "validation": { "min": 1, "max": 10 },
+      "readOnly": false,
+      "isBasic": false,
+      "category": "performance",
+      "order": 310
+    },
+    "retry.backoff.type": {
+      "type": "string",
+      "required": true,
+      "default": "exponential",
+      "description": "Backoff strategy: exponential, linear, or fixed",
+      "validation": { "enum": ["exponential", "linear", "fixed"] },
+      "readOnly": false,
+      "isBasic": false,
+      "category": "performance",
+      "order": 320
+    },
+    "retry.backoff.initialDelay": {
+      "type": "number",
+      "required": true,
+      "default": 1000,
+      "description": "Initial delay before first retry in milliseconds",
+      "validation": { "min": 100, "max": 10000 },
+      "readOnly": false,
+      "isBasic": false,
+      "category": "performance",
+      "order": 330
+    },
+    "retry.backoff.maxDelay": {
+      "type": "number",
+      "required": true,
+      "default": 10000,
+      "description": "Maximum delay between retries in milliseconds",
+      "validation": { "min": 1000, "max": 60000 },
+      "readOnly": false,
+      "isBasic": false,
+      "category": "performance",
+      "order": 350
+    },
+    "retry.backoff.multiplier": {
+      "type": "number",
+      "required": true,
+      "default": 2,
+      "description": "Exponential backoff multiplier",
+      "validation": { "min": 1, "max": 10 },
+      "readOnly": false,
+      "isBasic": false,
+      "category": "performance",
+      "order": 340
+    },
+    "retry.retryableErrors": {
+      "type": "array",
+      "required": true,
+      "default": ["ETIMEDOUT", "ECONNRESET", "ECONNREFUSED", 502, 503, 504, 429],
+      "description": "Retryable HTTP status codes and network error names",
+      "readOnly": false,
+      "isBasic": false,
+      "category": "performance",
+      "order": 360
+    },
+    "cache.enabled": {
+      "type": "boolean",
+      "required": true,
+      "default": true,
+      "description": "Enable host-provided caching",
+      "readOnly": false,
+      "isBasic": true,
+      "category": "performance",
+      "order": 10
+    },
+    "cache.provider": {
+      "type": "string",
+      "required": true,
+      "default": "memory",
+      "description": "Cache provider: system (inherit host), memory, file, redis, or none",
+      "validation": { "enum": ["system", "memory", "file", "redis", "none"] },
+      "readOnly": false,
+      "isBasic": false,
+      "category": "performance",
+      "order": 20
+    },
+    "cache.ttl.seriesMetadata": {
+      "type": "number",
+      "required": true,
+      "default": 86400,
+      "description": "TTL for series metadata in seconds (24h) - MangaBaka refreshes weekly per its own docs",
+      "validation": { "min": 60, "max": 2592000 },
+      "readOnly": true,
+      "isBasic": false,
+      "category": "performance",
+      "order": 820
+    },
+    "cache.ttl.searchResults": {
+      "type": "number",
+      "required": true,
+      "default": 3600,
+      "description": "TTL for search results in seconds (1h)",
+      "validation": { "min": 60, "max": 86400 },
+      "readOnly": true,
+      "isBasic": false,
+      "category": "performance",
+      "order": 830
+    },
+    "cache.ttl.library": {
+      "type": "number",
+      "required": true,
+      "default": 1800,
+      "description": "TTL for the user's library contents in seconds (30m) - user modifies it directly",
+      "validation": { "min": 60, "max": 86400 },
+      "readOnly": true,
+      "isBasic": false,
+      "category": "performance",
+      "order": 840
+    },
+    "cache.ttl.accessTokenFallback": {
+      "type": "number",
+      "required": true,
+      "default": 3300,
+      "description": "Fallback TTL for the OAuth2 access token in seconds (55m), used only if the token response omits expires_in",
+      "validation": { "min": 60, "max": 86400 },
+      "readOnly": true,
+      "isBasic": false,
+      "category": "performance",
+      "order": 860
+    },
+    "cache.ttl.coverUrls": {
+      "type": "number",
+      "required": true,
+      "default": 604800,
+      "description": "TTL for cover image URLs in seconds (7d)",
+      "validation": { "min": 3600, "max": 2592000 },
+      "readOnly": true,
+      "isBasic": false,
+      "category": "performance",
+      "order": 870
+    },
+    "cache.ttl.default": {
+      "type": "number",
+      "required": true,
+      "default": 3600,
+      "description": "Default TTL for uncategorized data in seconds (1h)",
+      "validation": { "min": 60, "max": 86400 },
+      "readOnly": false,
+      "isBasic": false,
+      "category": "performance",
+      "order": 30
+    },
+    "rateLimit.global.enabled": {
+      "type": "boolean",
+      "required": true,
+      "default": true,
+      "description": "Enable global rate limiting across all endpoints",
+      "readOnly": false,
+      "isBasic": false,
+      "category": "performance",
+      "order": 100
+    },
+    "rateLimit.global.maxConcurrent": {
+      "type": "number",
+      "required": true,
+      "default": 5,
+      "description": "Maximum concurrent requests allowed",
+      "validation": { "min": 1, "max": 50 },
+      "readOnly": false,
+      "isBasic": false,
+      "category": "performance",
+      "order": 110
+    },
+    "rateLimit.global.maxPerMinute": {
+      "type": "number",
+      "required": true,
+      "default": 170,
+      "description": "Maximum requests per minute globally - MangaBaka's default (non-search) limit is 180/min, IP-based",
+      "validation": { "min": 10, "max": 1000 },
+      "readOnly": false,
+      "isBasic": false,
+      "category": "performance",
+      "order": 130
+    },
+    "rateLimit.perEndpoint.enabled": {
+      "type": "boolean",
+      "required": true,
+      "default": true,
+      "description": "Enable per-endpoint minimum delays",
+      "readOnly": false,
+      "isBasic": false,
+      "category": "performance",
+      "order": 200
+    },
+    "rateLimit.perEndpoint.defaultDelay": {
+      "type": "number",
+      "required": true,
+      "default": 400,
+      "description": "Default delay between same-endpoint calls in milliseconds",
+      "validation": { "min": 0, "max": 60000 },
+      "readOnly": false,
+      "isBasic": false,
+      "category": "performance",
+      "order": 210
+    },
+    "resilience.circuitBreaker.enabled": {
+      "type": "boolean",
+      "required": true,
+      "default": false,
+      "description": "Enable circuit breaker pattern",
+      "readOnly": false,
+      "isBasic": false,
+      "category": "performance",
+      "order": 400
+    },
+    "resilience.circuitBreaker.failureThreshold": {
+      "type": "number",
+      "required": true,
+      "default": 5,
+      "description": "Failures before opening circuit",
+      "validation": { "min": 1, "max": 20 },
+      "readOnly": false,
+      "isBasic": false,
+      "category": "performance",
+      "order": 410
+    },
+    "resilience.circuitBreaker.failureWindow": {
+      "type": "number",
+      "required": true,
+      "default": 10000,
+      "description": "Time window for counting failures in milliseconds",
+      "validation": { "min": 1000, "max": 60000 },
+      "readOnly": false,
+      "isBasic": false,
+      "category": "performance",
+      "order": 420
+    },
+    "resilience.circuitBreaker.openDuration": {
+      "type": "number",
+      "required": true,
+      "default": 30000,
+      "description": "Duration circuit stays open in milliseconds",
+      "validation": { "min": 5000, "max": 300000 },
+      "readOnly": false,
+      "isBasic": false,
+      "category": "performance",
+      "order": 430
+    }
+  }
+}

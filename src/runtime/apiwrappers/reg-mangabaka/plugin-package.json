@@ -1,0 +1,24 @@
+{
+  "pluginName": "mangabaka",
+  "pluginType": "tracker",
+  "pluginContractVersion": "2.0.0",
+  "hostApiVersion": "1.0.0",
+  "iconPath": "images/mangabaka-icon.svg",
+  "capabilities": ["credential", "search.query", "search.lookup", "enrich", "enrich.cover", "sync.pull", "sync.push", "sync.list", "subscribe.add", "subscribe.remove"],
+  "entrypoints": {
+    "pluginModule": "apiwrappers/reg-mangabaka/plugin-module.cjs",
+    "settingsFile": "apiwrappers/reg-mangabaka/mangabaka-api-settings.json"
+  },
+  "syncOptions": {
+    "searchRequiresAuth": false,
+    "statusVocabulary": {
+      "READING":      null,
+      "COMPLETED":    null,
+      "PLAN_TO_READ": null,
+      "ON_HOLD":      null,
+      "DROPPED":      null,
+      "RE_READING":   null
+    },
+    "supportedActions": []
+  }
+}

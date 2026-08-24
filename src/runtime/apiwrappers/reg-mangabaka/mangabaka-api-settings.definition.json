@@ -46,32 +46,21 @@
       "category": "network",
       "order": 200
     },
-    "api.authBaseUrl": {
+    "api.endpoints.myProfile.template": {
       "type": "string",
       "required": true,
-      "default": "https://mangabaka.org/auth",
-      "description": "Base URL for MangaBaka's OAuth2/OIDC authorization server (separate host from api.baseUrl, per https://mangabaka.org/.well-known/openid-configuration)",
-      "validation": { "pattern": "^https://" },
+      "default": "${baseUrl}/my/profile",
+      "description": "Lightweight authenticated endpoint used only to validate a Personal Access Token (testCredentials/refreshCredentials) — no side effects.",
       "readOnly": true,
       "isBasic": false,
       "category": "network",
       "order": 205
     },
-    "api.endpoints.token.template": {
-      "type": "string",
-      "required": true,
-      "default": "${authBaseUrl}/oauth2/token",
-      "description": "OAuth2 token endpoint (client_credentials grant)",
-      "readOnly": true,
-      "isBasic": false,
-      "category": "network",
-      "order": 210
-    },
-    "api.endpoints.token.throttle": {
+    "api.endpoints.myProfile.throttle": {
       "type": "number",
       "required": false,
-      "default": 0,
-      "description": "Minimum delay between token requests (milliseconds)",
+      "default": 400,
+      "description": "Minimum delay between profile-check requests (milliseconds)",
       "validation": { "min": 0, "max": 60000 },
       "readOnly": true,
       "isBasic": false,
@@ -158,16 +147,6 @@
       "category": "performance",
       "order": 750
     },
-    "oauth.scope": {
-      "type": "string",
-      "required": true,
-      "default": "library.read library.write",
-      "description": "Space-separated OAuth2 scopes requested on the client_credentials token request, per MangaBaka's OIDC discovery document",
-      "readOnly": true,
-      "isBasic": false,
-      "category": "general",
-      "order": 45
-    },
     "ui.label": {
       "type": "string",
       "required": true,
@@ -193,18 +172,11 @@
       "required": true,
       "default": [
         {
-          "key": "client_id",
-          "label": "Client ID",
-          "type": "text",
-          "required": true,
-          "description": "OAuth2 client ID from a personal API client registered at mangabaka.org."
-        },
-        {
-          "key": "client_secret",
-          "label": "Client Secret",
+          "key": "api_key",
+          "label": "Personal Access Token",
           "type": "password",
           "required": true,
-          "description": "OAuth2 client secret for the registered client, used with the client_credentials grant."
+          "description": "Personal Access Token generated from your MangaBaka account/profile settings page. Sent as an x-api-key header — MangaBaka's OAuth2 client_credentials grant cannot access personal library data (confirmed live: it rejects with 401 \"Missing required scope\", since client_credentials represents the app itself, not a specific user)."
         }
       ],
       "description": "Credential template definition for tracker auth prompts",
@@ -218,8 +190,8 @@
       "required": false,
       "default": null,
       "label": "MangaBaka Credentials",
-      "description": "Securely store the MangaBaka OAuth2 client_id/client_secret used by the tracker wrapper's client_credentials grant.",
-      "helpText": "Opens the encrypted credential modal so operators can set the MangaBaka API client credentials directly from the Trackers settings tab.",
+      "description": "Securely store the MangaBaka Personal Access Token used as the x-api-key header for every authenticated call.",
+      "helpText": "Opens the encrypted credential modal so operators can set the MangaBaka Personal Access Token directly from the Trackers settings tab. Generate one from your account/profile settings page on mangabaka.org.",
       "isBasic": true,
       "readOnly": false,
       "implementationStatus": "implemented",
@@ -230,7 +202,7 @@
         "widget": "credential",
         "serviceName": "mangabaka",
         "credentialType": "tracker",
-        "credentialKeys": ["client_id", "client_secret"]
+        "credentialKeys": ["api_key"]
       }
     },
     "connection.timeout.connect": {
@@ -426,17 +398,6 @@
       "isBasic": false,
       "category": "performance",
       "order": 840
-    },
-    "cache.ttl.accessTokenFallback": {
-      "type": "number",
-      "required": true,
-      "default": 3300,
-      "description": "Fallback TTL for the OAuth2 access token in seconds (55m), used only if the token response omits expires_in",
-      "validation": { "min": 60, "max": 86400 },
-      "readOnly": true,
-      "isBasic": false,
-      "category": "performance",
-      "order": 860
     },
     "cache.ttl.coverUrls": {
       "type": "number",

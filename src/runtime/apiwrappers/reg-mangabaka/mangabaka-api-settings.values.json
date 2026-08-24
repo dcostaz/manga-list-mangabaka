@@ -43,9 +43,8 @@
   },
   "settings": {
     "api.baseUrl": "https://api.mangabaka.org/v1",
-    "api.authBaseUrl": "https://mangabaka.org/auth",
-    "api.endpoints.token.template": "${authBaseUrl}/oauth2/token",
-    "api.endpoints.token.throttle": 0,
+    "api.endpoints.myProfile.template": "${baseUrl}/my/profile",
+    "api.endpoints.myProfile.throttle": 400,
     "api.endpoints.seriesDetail.template": "${baseUrl}/series/${series_id}",
     "api.endpoints.seriesDetail.throttle": 400,
     "api.endpoints.seriesSearch.template": "${baseUrl}/series/search",
@@ -54,23 +53,15 @@
     "api.endpoints.myLibrary.throttle": 400,
     "api.endpoints.myLibraryEntry.template": "${baseUrl}/my/library/${series_id}",
     "api.endpoints.myLibraryEntry.throttle": 400,
-    "oauth.scope": "library.read library.write",
     "ui.label": "MangaBaka",
     "ui.icon": "images/mangabaka-icon.svg",
     "ui.credentialsTemplate": [
       {
-        "key": "client_id",
-        "label": "Client ID",
-        "type": "text",
-        "required": true,
-        "description": "OAuth2 client ID from a personal API client registered at mangabaka.org."
-      },
-      {
-        "key": "client_secret",
-        "label": "Client Secret",
+        "key": "api_key",
+        "label": "Personal Access Token",
         "type": "password",
         "required": true,
-        "description": "OAuth2 client secret for the registered client, used with the client_credentials grant."
+        "description": "Personal Access Token generated from your MangaBaka account/profile settings page. Sent as an x-api-key header."
       }
     ],
     "connection.timeout.connect": 5000,
@@ -91,7 +82,6 @@
     "cache.ttl.seriesMetadata": 86400,
     "cache.ttl.searchResults": 3600,
     "cache.ttl.library": 1800,
-    "cache.ttl.accessTokenFallback": 3300,
     "cache.ttl.coverUrls": 604800,
     "cache.ttl.default": 3600,
     "rateLimit.global.enabled": true,

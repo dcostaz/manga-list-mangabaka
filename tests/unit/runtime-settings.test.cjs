@@ -63,7 +63,6 @@ test('settings contract - merged payload includes required communication, cachin
   assert.equal(typeof effective.schema['retry.maxAttempts'], 'object');
 
   assert.equal(typeof effective.settings['api.baseUrl'], 'string');
-  assert.equal(typeof effective.settings['api.authBaseUrl'], 'string');
   assert.equal(typeof effective.settings['connection.timeout.request'], 'number');
   assert.equal(typeof effective.settings['cache.enabled'], 'boolean');
   assert.equal(typeof effective.settings['cache.ttl.default'], 'number');
@@ -72,11 +71,11 @@ test('settings contract - merged payload includes required communication, cachin
   assert.equal(typeof effective.settings['resilience.circuitBreaker.enabled'], 'boolean');
 });
 
-test('settings contract - credential template declares client_id/client_secret, not username/password', () => {
+test('settings contract - credential template declares a single Personal Access Token field', () => {
   const effective = buildEffectiveSettingsDocument();
   const template = effective.settings['ui.credentialsTemplate'];
 
   assert.ok(Array.isArray(template));
   const keys = template.map((field) => field.key).sort();
-  assert.deepEqual(keys, ['client_id', 'client_secret']);
+  assert.deepEqual(keys, ['api_key']);
 });

@@ -44,19 +44,6 @@ export interface MangaBakaHttpClientLike {
   ) => Promise<MangaBakaHttpResponseLike>;
 }
 
-/**
- * OAuth2 client_credentials token response, per MangaBaka's OIDC discovery
- * document (https://mangabaka.org/.well-known/openid-configuration):
- * token_endpoint returns a standard RFC 6749 §5.1 access token response.
- * No refresh_token is issued for this grant — a new token is simply
- * requested again from the same client_id/client_secret pair.
- */
-export interface MangaBakaTokenResponse {
-  access_token: string;
-  token_type: string;
-  expires_in: number;
-  scope?: string;
-}
 
 export interface MangaBakaSettingsDocument {
   metadata: Record<string, unknown>;

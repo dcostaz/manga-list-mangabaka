@@ -17,7 +17,6 @@ const SERVICE_NAME = 'mangabaka';
 /** @typedef {import('../../../../types/plugincontexttypedefs').PluginContextLike} PluginContextLike */
 /** @typedef {import('../../../../types/mangabakatypedefs').MangaBakaHttpClientLike} MangaBakaHttpClientLike */
 /** @typedef {import('../../../../types/mangabakatypedefs').MangaBakaCredentials} MangaBakaCredentials */
-/** @typedef {import('../../../../types/mangabakatypedefs').MangaBakaTokenResponse} MangaBakaTokenResponse */
 /** @typedef {import('../../../../types/mangabakatypedefs').MangaBakaRawSeries} MangaBakaRawSeries */
 
 /**
@@ -103,8 +102,6 @@ class MangaBakaAPIWrapper {
     this.settings = serviceSettings && typeof serviceSettings === 'object' ? serviceSettings : {};
     this.apiSettings = apiSettings instanceof MangaBakaAPISettings ? apiSettings : null;
     this._context = providedContext && typeof providedContext === 'object' ? providedContext : null;
-    /** @type {string | null} */
-    this.accessToken = null;
     /** @type {MangaBakaCredentials | null} */
     this.credentials = null;
     this._initialized = false;
@@ -240,8 +237,7 @@ class MangaBakaAPIWrapper {
   /** Credential fields the host renders in the plugin credential form. */
   get credentialSchema() {
     return Object.freeze([
-      { key: 'client_id', label: 'Client ID', type: 'text' },
-      { key: 'client_secret', label: 'Client Secret', type: 'password' },
+      { key: 'api_key', label: 'Personal Access Token', type: 'password' },
     ]);
   }
 
@@ -263,7 +259,18 @@ class MangaBakaAPIWrapper {
   }
 
   // ---------------------------------------------------------------------
-  // Credentials / OAuth2 client_credentials token
+  // Credentials — Personal Access Token (PAT), sent as `x-api-key`.
+  //
+  // OAuth2 client_credentials was tried first (per MangaBaka's own OIDC
+  // discovery document) and confirmed live to be a dead end: the token
+  // endpoint issues a token, but MangaBaka's resource server rejects
+  // GET /v1/my/library from it with 401 "Missing required scope" — a
+  // client_credentials token represents the app itself, not a specific user,
+  // so MangaBaka correctly refuses to bind personal library.* scopes to it.
+  // MangaBaka instead supports Personal Access Tokens (generated on the
+  // user's own account/profile settings page, format `mb-...`), sent as a
+  // static `x-api-key` header — no token endpoint, no expiry/refresh flow,
+  // no caching needed since the credential itself IS the usable value.
   // ---------------------------------------------------------------------
 
   /** @returns {Promise<PluginCredential | null>} */
@@ -284,13 +291,11 @@ class MangaBakaAPIWrapper {
   }
 
   /**
-   * The client_credentials grant has no user-consent session to expire — only
-   * the access token expires, and getToken(forceRefresh) already re-requests
-   * one from the same client_id/client_secret pair. There is nothing to
-   * "refresh" about the credential itself, so this validates that the current
-   * client_id/client_secret still work and returns it unchanged. Throws if
-   * they no longer work, signalling the broker that the user must re-enter
-   * credentials.
+   * A Personal Access Token has no separate expiry/refresh mechanism the API
+   * exposes — it's a static value the user generates and revokes manually on
+   * mangabaka.org. This validates the current token still works and returns
+   * it unchanged; throws if it no longer does, signalling the broker that the
+   * user must generate a new one and re-enter it.
    * @param {PluginCredential} current
    * @returns {Promise<PluginCredential>}
    */
@@ -298,149 +303,43 @@ class MangaBakaAPIWrapper {
     if (!current || typeof current !== 'object') {
       throw new Error('(refreshCredentials) current credential is required');
     }
-    await this._fetchClientCredentialsToken(current, { forceRefresh: true });
+    const stillValid = await this.testCredentials(current);
+    if (!stillValid) {
+      throw new Error('(refreshCredentials) Personal Access Token is no longer valid; generate a new one on mangabaka.org');
+    }
     return { ...current };
   }
 
   /**
+   * Minimal authenticated call (no side effects) to confirm the token works.
    * @param {MangaBakaCredentials} credentials
    * @returns {Promise<boolean>}
    */
   async testCredentials(credentials) {
+    const apiKey = credentials && typeof credentials === 'object' ? credentials.api_key : '';
+    if (!apiKey || !this.httpClient || typeof this.httpClient.get !== 'function') {
+      return false;
+    }
+    const endpoint = this._resolveEndpoint('api.endpoints.myProfile.template');
+    if (!endpoint) return false;
     try {
-      const tokenData = await this._fetchClientCredentialsToken(credentials, { forceRefresh: true });
-      return Boolean(tokenData && typeof tokenData.access_token === 'string' && tokenData.access_token.length > 0);
+      await this.httpClient.get(endpoint, { headers: { 'x-api-key': apiKey } });
+      return true;
     } catch (error) {
       return false;
     }
   }
 
   /**
-   * @param {boolean} [forceRefresh]
-   * @returns {Promise<string>}
+   * @protected
+   * @returns {{ 'x-api-key': string }}
    */
-  async getToken(forceRefresh = false) {
-    if (!forceRefresh && this.accessToken) {
-      return this.accessToken;
-    }
-
-    const cacheKey = this._getTokenCacheKey();
-    const cache = this._context && this._context.cache;
-    if (!forceRefresh && cache) {
-      const cached = await cache.getValue(cacheKey, { userScoped: true });
-      if (cached) {
-        const cachedToken = String(cached);
-        this.accessToken = cachedToken;
-        return cachedToken;
-      }
-    }
-
-    const credentials = await this.getCredentials();
-    if (!credentials) {
+  _authHeaders() {
+    const apiKey = this.credentials && typeof this.credentials === 'object' ? this.credentials.api_key : '';
+    if (!apiKey) {
       throw new Error('Credentials not found.');
     }
-
-    const tokenData = await this._fetchClientCredentialsToken(credentials, { forceRefresh });
-    const token = tokenData && typeof tokenData.access_token === 'string' ? tokenData.access_token : '';
-    if (!token) {
-      return '';
-    }
-
-    await this._cacheToken(tokenData);
-    this.accessToken = token;
-    return token;
-  }
-
-  /**
-   * @protected
-   * @returns {string}
-   */
-  _getTokenCacheKey() {
-    return `${SERVICE_NAME}_access_token`;
-  }
-
-  /**
-   * @param {MangaBakaCredentials} credentials
-   * @param {{ forceRefresh?: boolean }} [options]
-   * @returns {Promise<MangaBakaTokenResponse>}
-   */
-  async _fetchClientCredentialsToken(credentials, options = {}) {
-    const forceRefresh = options && typeof options === 'object' && options.forceRefresh === true;
-    const cacheKey = this._getTokenCacheKey();
-    const cache = this._context && this._context.cache;
-    if (!forceRefresh && cache) {
-      const cachedToken = await cache.getValue(cacheKey, { userScoped: true });
-      if (cachedToken) {
-        return { access_token: String(cachedToken), token_type: 'Bearer', expires_in: 0 };
-      }
-    }
-
-    const endpoint = this._resolveEndpoint('api.endpoints.token.template');
-    if (!endpoint) {
-      throw new Error('(_fetchClientCredentialsToken) Error: Missing token endpoint config');
-    }
-    if (!this.httpClient || typeof this.httpClient.post !== 'function') {
-      throw new Error('(_fetchClientCredentialsToken) Error: HTTP client is not configured');
-    }
-
-    const clientId = credentials && typeof credentials === 'object' ? credentials.client_id || '' : '';
-    const clientSecret = credentials && typeof credentials === 'object' ? credentials.client_secret || '' : '';
-    const scope = this._resolveSettingValue('oauth.scope') || 'library.read library.write';
-
-    // token_endpoint_auth_methods_supported includes client_secret_post (per
-    // https://mangabaka.org/.well-known/openid-configuration) — client_id/secret
-    // travel in the form body alongside grant_type/scope.
-    const body = new URLSearchParams();
-    body.append('grant_type', 'client_credentials');
-    body.append('client_id', clientId);
-    body.append('client_secret', clientSecret);
-    body.append('scope', String(scope));
-
-    let response;
-    try {
-      response = await this.httpClient.post(
-        endpoint,
-        body.toString(),
-        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } },
-      );
-    } catch (error) {
-      const detail = error instanceof Error ? error.message : String(error);
-      console.error(`[mangabaka] _fetchClientCredentialsToken: token request to ${endpoint} failed:`, detail);
-      throw error;
-    }
-
-    const data = response && typeof response === 'object' ? response.data : null;
-    const accessToken = data && typeof data === 'object' && typeof data.access_token === 'string' ? data.access_token : '';
-    if (!accessToken) {
-      throw new Error('(_fetchClientCredentialsToken) Error: Missing access_token in token response');
-    }
-
-    return {
-      access_token: accessToken,
-      token_type: typeof data.token_type === 'string' ? data.token_type : 'Bearer',
-      expires_in: typeof data.expires_in === 'number' ? data.expires_in : 0,
-      scope: typeof data.scope === 'string' ? data.scope : undefined,
-    };
-  }
-
-  /**
-   * @protected
-   * @param {MangaBakaTokenResponse} tokenData
-   * @returns {Promise<void>}
-   */
-  async _cacheToken(tokenData) {
-    const token = tokenData && typeof tokenData.access_token === 'string' ? tokenData.access_token : '';
-    const cache = this._context && this._context.cache;
-    if (!token || !cache) {
-      return;
-    }
-
-    const fallbackTtl = Number(this._resolveSettingValue('cache.ttl.accessTokenFallback')) || 3300;
-    // Cache slightly under the token's own expiry so a call never fires on an
-    // already-expired-but-still-cached token.
-    const ttl = tokenData.expires_in > 30 ? tokenData.expires_in - 30 : fallbackTtl;
-    await cache.setValue(this._getTokenCacheKey(), token, ttl, { userScoped: true });
-    this.accessToken = token;
+    return { 'x-api-key': apiKey };
   }
 
   // ---------------------------------------------------------------------
@@ -873,13 +772,17 @@ class MangaBakaAPIWrapper {
    * @returns {Promise<Record<string, unknown> | null>}
    */
   async _fetchLibraryEntry(seriesId) {
-    const token = await this.getToken();
-    if (!token) return null;
+    let authHeaders;
+    try {
+      authHeaders = this._authHeaders();
+    } catch {
+      return null;
+    }
 
     const endpoint = this._resolveEndpoint('api.endpoints.myLibraryEntry.template', { series_id: seriesId });
     try {
       const response = await this.httpClient.get(endpoint, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: authHeaders,
       });
       const body = response && typeof response === 'object' ? response.data : null;
       return body && typeof body === 'object' && body.data ? body.data : body;
@@ -917,9 +820,7 @@ class MangaBakaAPIWrapper {
    */
   async _pushProgressOne(pluginEntryId, progress = {}) {
     try {
-      const token = await this.getToken();
-      if (!token) return { pluginEntryId: String(pluginEntryId), success: false, error: 'Not authenticated' };
-
+      const authHeaders = this._authHeaders();
       const endpoint = this._resolveEndpoint('api.endpoints.myLibraryEntry.template', { series_id: pluginEntryId });
       const payload = {};
       if (typeof progress.chapter === 'number') payload.chapter = progress.chapter;
@@ -927,7 +828,7 @@ class MangaBakaAPIWrapper {
       if (typeof progress.rating === 'number') payload.rating = progress.rating;
 
       await this.httpClient.patch(endpoint, payload, {
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        headers: { ...authHeaders, 'Content-Type': 'application/json' },
       });
       return { pluginEntryId: String(pluginEntryId), success: true };
     } catch (error) {
@@ -973,8 +874,12 @@ class MangaBakaAPIWrapper {
    * @returns {Promise<Array<{ pluginEntryId: string, title: string|null, canonicalUrl: string|null, status: string|null, rating: number|null, chapter: number|null, volume: number|null, listId: number|null, priority: number|null, lastUpdated: string|null, comparison: object|null }>>}
    */
   async getReadingList(options = {}) {
-    const token = await this.getToken();
-    if (!token) return [];
+    let authHeaders;
+    try {
+      authHeaders = this._authHeaders();
+    } catch {
+      return [];
+    }
 
     const cacheKey = `${SERVICE_NAME}_library_list`;
     const ttl = Number(this._resolveSettingValue('cache.ttl.library')) || 1800;
@@ -985,7 +890,7 @@ class MangaBakaAPIWrapper {
 
     const endpoint = this._resolveEndpoint('api.endpoints.myLibrary.template');
     const response = await this.httpClient.get(endpoint, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: authHeaders,
     });
     const body = response && typeof response === 'object' ? response.data : null;
     /** @type {Array<Record<string, unknown>>} */
@@ -1073,9 +978,7 @@ class MangaBakaAPIWrapper {
    */
   async _subscribeOne(pluginEntryId, context) {
     try {
-      const token = await this.getToken();
-      if (!token) return { pluginEntryId: String(pluginEntryId), success: false, error: 'Not authenticated' };
-
+      const authHeaders = this._authHeaders();
       const status = context && typeof context.status === 'string' ? context.status : undefined;
       const endpoint = this._resolveEndpoint('api.endpoints.myLibraryEntry.template', { series_id: pluginEntryId });
       // ASSUMPTION: PATCH with { status } both adds a new entry and updates an
@@ -1083,7 +986,7 @@ class MangaBakaAPIWrapper {
       // to /v1/my/library with { series_id, status } for new entries, split
       // this into an existence check + POST/PATCH branch once verified live.
       await this.httpClient.patch(endpoint, { status }, {
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        headers: { ...authHeaders, 'Content-Type': 'application/json' },
       });
       return { pluginEntryId: String(pluginEntryId), success: true };
     } catch (error) {
@@ -1114,13 +1017,11 @@ class MangaBakaAPIWrapper {
    */
   async _unsubscribeOne(pluginEntryId) {
     try {
-      const token = await this.getToken();
-      if (!token) return { pluginEntryId: String(pluginEntryId), success: false, error: 'Not authenticated' };
-
+      const authHeaders = this._authHeaders();
       const endpoint = this._resolveEndpoint('api.endpoints.myLibraryEntry.template', { series_id: pluginEntryId });
       try {
         await this.httpClient.delete(endpoint, {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: authHeaders,
         });
       } catch (rawError) {
         const error = /** @type {any} */ (rawError);

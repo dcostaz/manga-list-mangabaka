@@ -19,20 +19,18 @@ function createMaskedOutputStream() {
   return output;
 }
 
-async function promptForCredentials() {
+async function promptForApiKey() {
   const output = createMaskedOutputStream();
   const rl = readline.createInterface({ input: process.stdin, output, terminal: true });
 
   try {
-    const clientId = (await rl.question('MangaBaka Client ID: ')).trim();
-
-    process.stdout.write('MangaBaka Client Secret: ');
+    process.stdout.write('MangaBaka Personal Access Token: ');
     output.muted = true;
-    const clientSecret = (await rl.question('')).trim();
+    const apiKey = (await rl.question('')).trim();
     output.muted = false;
     process.stdout.write('\n');
 
-    return { clientId, clientSecret };
+    return apiKey;
   } finally {
     rl.close();
   }
@@ -44,22 +42,19 @@ async function run() {
     process.exit(1);
   }
 
-  let clientId = typeof process.env.MB_TEST_CLIENT_ID === 'string' ? process.env.MB_TEST_CLIENT_ID.trim() : '';
-  let clientSecret = typeof process.env.MB_TEST_CLIENT_SECRET === 'string' ? process.env.MB_TEST_CLIENT_SECRET.trim() : '';
+  let apiKey = typeof process.env.MB_TEST_API_KEY === 'string' ? process.env.MB_TEST_API_KEY.trim() : '';
 
-  if (!clientId || !clientSecret) {
+  if (!apiKey) {
     if (!process.stdin.isTTY || !process.stdout.isTTY) {
-      console.error('No interactive terminal detected. Set MB_TEST_CLIENT_ID and MB_TEST_CLIENT_SECRET and retry.');
+      console.error('No interactive terminal detected. Set MB_TEST_API_KEY and retry.');
       process.exit(1);
     }
 
-    const prompted = await promptForCredentials();
-    clientId = prompted.clientId;
-    clientSecret = prompted.clientSecret;
+    apiKey = await promptForApiKey();
   }
 
-  if (!clientId || !clientSecret) {
-    console.error('Client ID and Client Secret are required.');
+  if (!apiKey) {
+    console.error('A Personal Access Token is required.');
     process.exit(1);
   }
 
@@ -76,8 +71,7 @@ async function run() {
       env: {
         ...process.env,
         ENABLE_REAL_LIBRARY_TEST: '1',
-        MB_TEST_CLIENT_ID: clientId,
-        MB_TEST_CLIENT_SECRET: clientSecret,
+        MB_TEST_API_KEY: apiKey,
       },
     },
   );

@@ -25,7 +25,6 @@ function createMockHttpClient() {
   };
   const client = {
     interceptors: { response: { use() { return 0; } } },
-    async post() { return { data: { access_token: 'library-token', token_type: 'Bearer', expires_in: 3600 } }; },
     async get(url, config) {
       hooks.getCalls.push({ url, config });
       const result = hooks.getHandler(url, config);
@@ -52,16 +51,13 @@ async function createWrapper(httpClient, cacheAdapter) {
   const wrapper = await MangaBakaAPIWrapper.init({
     serviceSettings: {
       'api.baseUrl': 'https://api.mangabaka.org/v1',
-      'api.authBaseUrl': 'https://mangabaka.org/auth',
-      'api.endpoints.token.template': '${authBaseUrl}/oauth2/token',
       'api.endpoints.myLibrary.template': '${baseUrl}/my/library',
       'api.endpoints.myLibraryEntry.template': '${baseUrl}/my/library/${series_id}',
-      'oauth.scope': 'library.read library.write',
     },
     httpClient,
     context: { cache: cacheAdapter || createMockCacheAdapter(), utils: null },
   });
-  await wrapper.setCredentials({ client_id: 'demo-client', client_secret: 'demo-secret' });
+  await wrapper.setCredentials({ api_key: 'mb-test-token' });
   return wrapper;
 }
 

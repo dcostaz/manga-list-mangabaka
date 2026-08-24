@@ -47,10 +47,8 @@ test('buildEffectiveSettingsDocument merges definition and values into runtime p
   assert.equal(typeof effective.schema['api.baseUrl'], 'object');
   assert.equal(typeof effective.schema['api.endpoints.seriesDetail.template'], 'object');
   assert.equal(effective.settings['api.baseUrl'], 'https://api.mangabaka.org/v1');
-  assert.equal(effective.settings['api.authBaseUrl'], 'https://mangabaka.org/auth');
-  assert.equal(effective.settings['api.endpoints.token.template'], '${authBaseUrl}/oauth2/token');
+  assert.equal(effective.settings['api.endpoints.myProfile.template'], '${baseUrl}/my/profile');
   assert.equal(effective.settings['api.endpoints.seriesSearch.template'], '${baseUrl}/series/search');
-  assert.equal(effective.settings['oauth.scope'], 'library.read library.write');
 });
 
 test('buildMangabakaPackage creates zip with plugin-package.json and runtime files', async () => {

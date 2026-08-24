@@ -36,11 +36,21 @@ were verified live.
 
 ## Authentication
 
-MangaBaka uses OAuth2/OIDC (discovery document: `https://mangabaka.org/.well-known/openid-configuration`),
-**not** username/password. This plugin uses the `client_credentials` grant against a personal API
-client registered at mangabaka.org — `credentialSchema` is `client_id`/`client_secret`, not
-`username`/`password`. Register a client at mangabaka.org, then enter its Client ID/Secret via the
-host's Trackers settings tab (`credentials.primary` in the settings schema).
+MangaBaka publishes an OAuth2/OIDC discovery document
+(`https://mangabaka.org/.well-known/openid-configuration`) advertising `client_credentials` as a
+supported grant — **this was tried first and confirmed live to be a dead end**: the token endpoint
+issues a token, but `GET /v1/my/library` rejects it with `401 {"message":"BAD_REQUEST: Missing
+required scope"}`. A `client_credentials` token represents the *application*, not any specific
+user, so MangaBaka correctly refuses to bind personal `library.read`/`library.write` scopes to one
+— those would require the `authorization_code` (+ PKCE) flow instead, real per-user browser login,
+which is new infrastructure this codebase doesn't have.
+
+Instead, this plugin uses MangaBaka's **Personal Access Token** (PAT) support — a static token you
+generate on your own MangaBaka account/profile settings page, sent as a plain `x-api-key` header on
+every authenticated request. `credentialSchema` is a single `api_key` field. Generate a token on
+mangabaka.org, then enter it via the host's Trackers settings tab (`credentials.primary` in the
+settings schema). There's no token endpoint, no expiry, no refresh flow — the credential itself is
+the usable value; `refreshCredentials()` simply re-validates it and returns it unchanged.
 
 Latest runtime zip download (GitHub release asset):
 
@@ -105,23 +115,23 @@ Manual local integration tests (excluded from `npm test` and CI):
 
 ```bash
 npm run test:search:interactive    # no credentials needed — public search/lookup endpoints
-npm run test:library:interactive   # prompts for a real Client ID/Secret; verifies /v1/my/library
+npm run test:library:interactive   # prompts for a real Personal Access Token; verifies /v1/my/library
 ```
 
-For non-interactive shells, set `MB_TEST_SEARCH_QUERY`, or `MB_TEST_CLIENT_ID`/`MB_TEST_CLIENT_SECRET`,
-before running the corresponding command.
+For non-interactive shells, set `MB_TEST_SEARCH_QUERY` or `MB_TEST_API_KEY` before running the
+corresponding command.
 
 Unit test suites:
 
 1. `tests/unit/build-runtime-plugin-package.test.cjs`
 2. `tests/unit/runtime-settings.test.cjs`
 3. `tests/unit/runtime-wrapper-contract.test.cjs` (includes the capabilities-matches-manifest drift guard)
-4. `tests/unit/runtime-wrapper-token.test.cjs` (OAuth2 `client_credentials` flow)
+4. `tests/unit/runtime-wrapper-credentials.test.cjs` (Personal Access Token validation via `testCredentials()`/`refreshCredentials()`)
 5. `tests/unit/runtime-wrapper-search-cover.test.cjs`
 6. `tests/unit/runtime-wrapper-readinglist.test.cjs` (`sync.*`/`subscribe.*` — see the assumption caveat above)
 
 ## pluginType
 
 Declared as `tracker`, per the identity test in `docs/manga-list-architecture.md` §3.8.1: the
-registered OAuth client is personal to the user's account and grants `library.read`/`library.write`
+Personal Access Token is bound to the user's own account and grants `library.read`/`library.write`
 scoped access to *their* library — the remote system holds a reading list that belongs to this user.

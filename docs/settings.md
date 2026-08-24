@@ -33,21 +33,26 @@ During development (unit tests, integration tests in this repo) only Tier 1 is a
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `client_id` | text | yes | OAuth2 client ID from a personal API client registered at mangabaka.org |
-| `client_secret` | password | yes | OAuth2 client secret for that client |
+| `api_key` | password | yes | Personal Access Token generated on your MangaBaka account/profile settings page |
 
 ---
 
 ## Authentication Architecture
 
-MangaBaka is an OAuth2/OIDC provider (discovery document:
-`https://mangabaka.org/.well-known/openid-configuration`). This plugin uses the
-**`client_credentials`** grant — `client_id`/`client_secret` are POSTed directly to the token
-endpoint (form-encoded, `client_secret_post` auth method) to obtain an access token scoped by
-`oauth.scope` (`library.read library.write`). There is no username/password and no browser
-redirect flow. The access token is cached (`context.cache`, `userScoped: true`) for
-`expires_in - 30` seconds; `getToken(forceRefresh)` simply requests a fresh one from the same
-client credentials — there is no separate `refresh_token` grant in play for this flow.
+MangaBaka publishes an OAuth2/OIDC discovery document
+(`https://mangabaka.org/.well-known/openid-configuration`) advertising `client_credentials` as a
+supported grant. **This was tried first and confirmed live to fail**: the token endpoint issues a
+token, but `GET /v1/my/library` rejects it with `401 {"message":"BAD_REQUEST: Missing required
+scope"}` — a `client_credentials` token represents the application, not a specific user, so
+MangaBaka correctly refuses to bind personal `library.*` scopes to one. Reaching personal data that
+way would require the `authorization_code` (+ PKCE) flow instead — real per-user browser login,
+which is new infrastructure this codebase doesn't have.
+
+This plugin instead uses MangaBaka's **Personal Access Token** (PAT) support: a static token, sent
+as a plain `x-api-key` header on every authenticated request. There is no token endpoint, no
+expiry, and no refresh flow — the credential itself is the usable value.
+`refreshCredentials()`/`testCredentials()` make a lightweight `GET /v1/my/profile` call to confirm
+the token still works; there is nothing to cache or renew.
 
 ---
 
@@ -59,8 +64,7 @@ updating the package source and releasing a new runtime zip.
 | Key | Default | Order | Description |
 |-----|---------|-------|-------------|
 | `api.baseUrl` | `https://api.mangabaka.org/v1` | 200 | MangaBaka public data API base URL |
-| `api.authBaseUrl` | `https://mangabaka.org/auth` | 205 | MangaBaka OAuth2/OIDC authorization server base URL (separate host from `api.baseUrl`) |
-| `api.endpoints.token.template` | `${authBaseUrl}/oauth2/token` | 210 | OAuth2 token endpoint (`client_credentials` grant) |
+| `api.endpoints.myProfile.template` | `${baseUrl}/my/profile` | 205 | Lightweight authenticated endpoint used only to validate a Personal Access Token — no side effects |
 | `api.endpoints.seriesDetail.template` | `${baseUrl}/series/${series_id}` | 220 | Full series details by ID — public, verified live |
 | `api.endpoints.seriesSearch.template` | `${baseUrl}/series/search` | 230 | Search series by title — public, verified live |
 | `api.endpoints.myLibrary.template` | `${baseUrl}/my/library` | 240 | **ASSUMPTION** — list/read the authenticated user's library. Confirmed to exist (401 unauthenticated); exact response shape unverified. |

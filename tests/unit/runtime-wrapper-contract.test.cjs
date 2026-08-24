@@ -45,10 +45,10 @@ test('wrapper contract - pluginType is tracker (personal client_credentials gran
   assert.deepEqual(wrapper.pluginType, ['tracker']);
 });
 
-test('wrapper contract - credentialSchema declares client_id/client_secret, not username/password', async () => {
+test('wrapper contract - credentialSchema declares a single Personal Access Token field', async () => {
   const wrapper = await MangaBakaAPIWrapper.init();
   const keys = wrapper.credentialSchema.map((field) => field.key).sort();
-  assert.deepEqual(keys, ['client_id', 'client_secret']);
+  assert.deepEqual(keys, ['api_key']);
 });
 
 // ---------------------------------------------------------------------------

@@ -46,16 +46,14 @@ function createFetchHttpClient() {
 }
 
 test(
-  'interactive library integration - authenticates via client_credentials and reads the real /v1/my/library shape',
+  'interactive library integration - authenticates via Personal Access Token and reads the real /v1/my/library shape',
   {
     skip: shouldSkip && 'Set ENABLE_REAL_LIBRARY_TEST=1 and run locally (not CI).',
     timeout: 60000,
   },
   async () => {
-    const clientId = typeof process.env.MB_TEST_CLIENT_ID === 'string' ? process.env.MB_TEST_CLIENT_ID.trim() : '';
-    const clientSecret = typeof process.env.MB_TEST_CLIENT_SECRET === 'string' ? process.env.MB_TEST_CLIENT_SECRET.trim() : '';
-    assert.ok(clientId, 'MB_TEST_CLIENT_ID is required.');
-    assert.ok(clientSecret, 'MB_TEST_CLIENT_SECRET is required.');
+    const apiKey = typeof process.env.MB_TEST_API_KEY === 'string' ? process.env.MB_TEST_API_KEY.trim() : '';
+    assert.ok(apiKey, 'MB_TEST_API_KEY is required.');
 
     const effectiveSettings = buildEffectiveSettingsDocument();
     const wrapper = await MangaBakaAPIWrapper.init({
@@ -63,35 +61,12 @@ test(
       httpClient: createFetchHttpClient(),
     });
 
-    await wrapper.setCredentials({ client_id: clientId, client_secret: clientSecret });
+    await wrapper.setCredentials({ api_key: apiKey });
 
-    process.stdout.write('[library-test] Requesting client_credentials token...\n');
-    const tokenData = await wrapper._fetchClientCredentialsToken(
-      { client_id: clientId, client_secret: clientSecret },
-      { forceRefresh: true },
-    );
-    process.stdout.write(`[library-test] Token response: token_type=${tokenData.token_type} expires_in=${tokenData.expires_in} scope=${JSON.stringify(tokenData.scope)}\n`);
-
-    const token = tokenData.access_token;
-    assert.equal(typeof token, 'string');
-    assert.ok(token.length > 0, 'Expected a non-empty access token');
-    process.stdout.write('[library-test] Token acquired.\n');
-
-    // Best-effort JWT payload decode (no signature verification — read-only diagnostic).
-    // If the access token is a JWT, its own `scope`/`aud`/`azp` claims are the ground truth for
-    // what the authorization server actually granted, regardless of what the token response's
-    // top-level `scope` field says.
-    const jwtParts = token.split('.');
-    if (jwtParts.length === 3) {
-      try {
-        const payload = JSON.parse(Buffer.from(jwtParts[1], 'base64url').toString('utf8'));
-        process.stdout.write(`[library-test] Access token JWT payload: ${JSON.stringify(payload, null, 2)}\n`);
-      } catch (err) {
-        process.stdout.write(`[library-test] Access token looks JWT-shaped but payload decode failed: ${err instanceof Error ? err.message : String(err)}\n`);
-      }
-    } else {
-      process.stdout.write('[library-test] Access token is not JWT-shaped (opaque token) — no client-side claim inspection possible.\n');
-    }
+    process.stdout.write('[library-test] Validating Personal Access Token via testCredentials()...\n');
+    const valid = await wrapper.testCredentials({ api_key: apiKey });
+    assert.equal(valid, true, 'testCredentials() should succeed with a real Personal Access Token');
+    process.stdout.write('[library-test] Token validated against GET /v1/my/profile.\n');
 
     process.stdout.write('[library-test] Fetching GET /v1/my/library via getReadingList()...\n');
     process.stdout.write('[library-test] NOTE: getReadingList()/pullProgress() encode ASSUMPTIONS about the\n');

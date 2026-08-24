@@ -66,7 +66,7 @@ Build output contains:
 4. `apiwrappers/reg-mangabaka/api-wrapper-mangabaka.cjs`
 5. `apiwrappers/reg-mangabaka/api-settings-mangabaka.cjs`
 6. `apiwrappers/reg-mangabaka/mangabaka-api-settings.json` (generated effective settings used at runtime; not an authored source file)
-7. `images/mangabaka-icon.svg`
+7. `images/mangabaka-icon.svg` (real logo asset)
 
 Settings source of truth in this repository is split into:
 

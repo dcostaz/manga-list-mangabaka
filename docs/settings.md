@@ -25,7 +25,7 @@ During development (unit tests, integration tests in this repo) only Tier 1 is a
 | Key | Default | Notes |
 |-----|---------|-------|
 | `ui.label` | `MangaBaka` | Display name shown in the host UI |
-| `ui.icon` | `images/mangabaka-icon.svg` | Icon path relative to the runtime package (placeholder asset — replace before release) |
+| `ui.icon` | `images/mangabaka-icon.svg` | Icon path relative to the runtime package |
 | `ui.credentialsTemplate` | See below | Credential form schema |
 | `credentials.primary` | `null` | Managed via host keychain; never stored in the settings file |
 

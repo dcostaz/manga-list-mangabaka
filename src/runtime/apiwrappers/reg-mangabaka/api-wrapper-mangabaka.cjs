@@ -955,11 +955,24 @@ class MangaBakaAPIWrapper {
   }
 
   /**
-   * host-capability-contract.md §2's sync.list mapping — the user's whole
-   * remote library in one call, for reconciliation.
-   * @returns {Promise<Array<{ pluginEntryId: string, readingStatus: string | null, chapter: number | null, volume: number | null, rating: number | null }>>}
+   * host-capability-contract.md §2's sync.list mapping documents this as `pullList()` —
+   * confirmed via grep that nothing in the host actually calls that name; the real, live
+   * dispatcher is `PluginService.getReadingListEntries()` (`cls/services/pluginservice.cjs:1746,
+   * 1757`), which requires the method to be named exactly `getReadingList` and gates on it with
+   * `typeof instance.getReadingList !== 'function'` — a plugin named to the documented contract
+   * is silently treated as not supporting a reading list at all, exactly as MangaUpdates'/
+   * MangaDex's own real `getReadingList()` methods are already named. Matching their precedent,
+   * not the doc, is what the host actually dispatches.
+   *
+   * Return shape also follows the real contract (`pluginservice.cjs:1735-1737`'s own JSDoc),
+   * not `PluginProgressDTO`: `status`/`title`/`canonicalUrl`/`listId`/`priority` fields, not
+   * `readingStatus`. `title` is `null` here — the ASSUMPTION-marked `/v1/my/library` shape isn't
+   * confirmed to carry one (see docs/plugins/mangabaka/requirements.md §5); the host's own
+   * title-drift check already no-ops when `title` isn't a non-empty string.
+   * @param {{ hostProgressByEntryId?: Map<string, object> }} [options]
+   * @returns {Promise<Array<{ pluginEntryId: string, title: string|null, canonicalUrl: string|null, status: string|null, rating: number|null, chapter: number|null, volume: number|null, listId: number|null, priority: number|null, lastUpdated: string|null, comparison: object|null }>>}
    */
-  async pullList() {
+  async getReadingList(options = {}) {
     const token = await this.getToken();
     if (!token) return [];
 
@@ -967,7 +980,7 @@ class MangaBakaAPIWrapper {
     const ttl = Number(this._resolveSettingValue('cache.ttl.library')) || 1800;
     const cached = await this._getJSONCacheValue(cacheKey, { userScoped: true });
     if (cached) {
-      return /** @type {Array<{ pluginEntryId: string, readingStatus: string | null, chapter: number | null, volume: number | null, rating: number | null }>} */ (cached);
+      return /** @type {any} */ (cached);
     }
 
     const endpoint = this._resolveEndpoint('api.endpoints.myLibrary.template');
@@ -978,13 +991,35 @@ class MangaBakaAPIWrapper {
     /** @type {Array<Record<string, unknown>>} */
     const rows = body && typeof body === 'object' && Array.isArray(body.data) ? body.data : [];
 
-    const results = rows.map((row) => ({
-      pluginEntryId: String(row.series_id ?? row.id),
-      readingStatus: typeof row.status === 'string' ? row.status : null,
-      chapter: typeof row.chapter === 'number' ? row.chapter : null,
-      volume: typeof row.volume === 'number' ? row.volume : null,
-      rating: typeof row.rating === 'number' ? row.rating : null,
-    }));
+    const hostProgressByEntryId = options && options.hostProgressByEntryId instanceof Map
+      ? options.hostProgressByEntryId
+      : null;
+
+    const results = rows.map((row) => {
+      const pluginEntryId = String(row.series_id ?? row.id);
+      const status = typeof row.status === 'string' ? row.status : null;
+      const chapter = typeof row.chapter === 'number' ? row.chapter : null;
+      const rating = typeof row.rating === 'number' ? row.rating : null;
+
+      const hostProgress = hostProgressByEntryId ? hostProgressByEntryId.get(pluginEntryId) : null;
+      const comparison = hostProgress
+        ? this.compareProgress(hostProgress, { readingStatus: status, chapter, rating })
+        : null;
+
+      return {
+        pluginEntryId,
+        title: null,
+        canonicalUrl: null,
+        status,
+        rating,
+        chapter,
+        volume: typeof row.volume === 'number' ? row.volume : null,
+        listId: null,
+        priority: null,
+        lastUpdated: typeof row.updated_at === 'string' ? row.updated_at : null,
+        comparison,
+      };
+    });
 
     await this._setJSONCacheValue(cacheKey, results, ttl, { userScoped: true });
     return results;

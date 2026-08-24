@@ -71,16 +71,16 @@ test(
     assert.ok(token.length > 0, 'Expected a non-empty access token');
     process.stdout.write('[library-test] Token acquired.\n');
 
-    process.stdout.write('[library-test] Fetching GET /v1/my/library via pullList()...\n');
-    process.stdout.write('[library-test] NOTE: pullList()/pullProgress() encode ASSUMPTIONS about the\n');
+    process.stdout.write('[library-test] Fetching GET /v1/my/library via getReadingList()...\n');
+    process.stdout.write('[library-test] NOTE: getReadingList()/pullProgress() encode ASSUMPTIONS about the\n');
     process.stdout.write('[library-test] response shape (see docs/plugins/mangabaka/architecture.md) — a\n');
     process.stdout.write('[library-test] thrown error or an empty/malformed result here is expected on\n');
     process.stdout.write('[library-test] the first real run and should drive a wrapper fix, not be treated\n');
     process.stdout.write('[library-test] as this test being broken.\n\n');
 
-    const list = await wrapper.pullList();
-    process.stdout.write(`[library-test] pullList() returned ${JSON.stringify(list, null, 2)}\n`);
-    assert.ok(Array.isArray(list), 'pullList() must return an array even if empty');
+    const list = await wrapper.getReadingList();
+    process.stdout.write(`[library-test] getReadingList() returned ${JSON.stringify(list, null, 2)}\n`);
+    assert.ok(Array.isArray(list), 'getReadingList() must return an array even if empty');
 
     if (list.length > 0) {
       const [firstEntry] = list;

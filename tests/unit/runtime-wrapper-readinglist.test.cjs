@@ -126,7 +126,7 @@ test('pushProgress - never sends status, only chapter/volume/rating', async () =
   assert.deepEqual(hooks.patchCalls[0].body, { chapter: 5, volume: 1, rating: 9 });
 });
 
-test('pullList - maps the full library and caches it userScoped', async () => {
+test('getReadingList - maps the full library and caches it userScoped (real dispatch name, not sync.list\'s documented pullList)', async () => {
   const { client, hooks } = createMockHttpClient();
   hooks.getHandler = (url) => {
     if (url.includes('/my/library')) {
@@ -136,12 +136,33 @@ test('pullList - maps the full library and caches it userScoped', async () => {
   };
 
   const wrapper = await createWrapper(client, createMockCacheAdapter());
-  const list = await wrapper.pullList();
+  // cls/services/pluginservice.cjs:1746 gates on typeof instance.getReadingList === 'function' —
+  // this is the method name PluginService actually calls, not `pullList`.
+  const list = await wrapper.getReadingList();
 
   assert.equal(list.length, 2);
   assert.equal(list[0].pluginEntryId, '1');
-  assert.equal(list[0].readingStatus, 'reading');
+  assert.equal(list[0].status, 'reading');
+  assert.equal(list[0].chapter, 3);
   assert.equal(list[1].pluginEntryId, '2');
+});
+
+test('getReadingList - computes a per-row comparison when options.hostProgressByEntryId is supplied', async () => {
+  const { client, hooks } = createMockHttpClient();
+  hooks.getHandler = (url) => {
+    if (url.includes('/my/library')) {
+      return { data: { data: [{ series_id: 1, status: 'completed', chapter: 40, rating: 9 }] } };
+    }
+    return { data: null };
+  };
+
+  const wrapper = await createWrapper(client, createMockCacheAdapter());
+  const hostProgressByEntryId = new Map([['1', { readingStatus: 'reading', chapter: 30, rating: 8 }]]);
+  const list = await wrapper.getReadingList({ hostProgressByEntryId });
+
+  assert.equal(list[0].comparison.chapterAhead, true);
+  assert.equal(list[0].comparison.statusDiffers, true);
+  assert.equal(list[0].comparison.ratingDiffers, true);
 });
 
 test('subscribe - array in, array out, per-entry failure never a whole-batch throw', async () => {

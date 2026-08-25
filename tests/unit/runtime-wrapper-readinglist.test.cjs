@@ -202,12 +202,32 @@ test('subscribe - array in, array out, per-entry failure never a whole-batch thr
 
   const wrapper = await createWrapper(client, createMockCacheAdapter());
   const results = await wrapper.subscribe([
-    { pluginEntryId: 1, status: 'reading' },
-    { pluginEntryId: 2, status: 'reading' },
+    { pluginEntryId: 1, status: 'READING' },
+    { pluginEntryId: 2, status: 'READING' },
   ]);
 
   assert.equal(results[0].success, true);
   assert.equal(results[1].success, false);
+});
+
+test('subscribe - resolves the local status enum to MangaBaka\'s native state before sending (real bug: host passes the raw local enum, not a pre-resolved value)', async () => {
+  const { client, hooks } = createMockHttpClient();
+
+  const wrapper = await createWrapper(client, createMockCacheAdapter());
+  await wrapper.subscribe([{ pluginEntryId: 1, status: 'PLAN_TO_READ' }]);
+
+  assert.equal(hooks.patchCalls.length, 1);
+  assert.deepEqual(hooks.patchCalls[0].body, { state: 'plan_to_read' });
+});
+
+test('subscribe - fails cleanly (never sends the raw local string) for an unrecognized status', async () => {
+  const { client } = createMockHttpClient();
+  const wrapper = await createWrapper(client, createMockCacheAdapter());
+
+  const [result] = await wrapper.subscribe([{ pluginEntryId: 1, status: 'NOT_A_REAL_STATUS' }]);
+
+  assert.equal(result.success, false);
+  assert.match(result.error, /No native MangaBaka state/);
 });
 
 test('unsubscribe - idempotent: a 404 on an already-absent entry is still success', async () => {

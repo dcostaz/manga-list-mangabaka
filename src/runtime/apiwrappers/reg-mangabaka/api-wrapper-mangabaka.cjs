@@ -1061,6 +1061,32 @@ class MangaBakaAPIWrapper {
   // ---------------------------------------------------------------------
 
   /**
+   * Resolves a local reading-status enum value to MangaBaka's native `state`
+   * string — the push-direction half of `tracker-template.md` §6's two-layer
+   * mapping. Confirmed live 2026-08-25: the host does NOT do this resolution
+   * itself before calling `subscribe()` — `cls/handlers/apipluginhandler.cjs`
+   * passes the raw local enum straight through (`{ status: bookmark.reading_status }`);
+   * `plugin-package.json`'s `syncOptions.statusVocabulary` is only ever used
+   * host-side as a null-check gate, never relayed as a value. Every plugin
+   * must do its own local->native resolution (MangaUpdates' wrapper does the
+   * same via its own `statusMapping.*` settings lookup). Values here must
+   * match `plugin-package.json`'s `syncOptions.statusVocabulary` exactly.
+   * @param {string} localStatus
+   * @returns {string | null}
+   */
+  _resolveNativeStatus(localStatus) {
+    switch (localStatus) {
+      case 'READING': return 'reading';
+      case 'COMPLETED': return 'completed';
+      case 'PLAN_TO_READ': return 'plan_to_read';
+      case 'ON_HOLD': return 'on_hold';
+      case 'DROPPED': return 'dropped';
+      case 'RE_READING': return 'rereading';
+      default: return null;
+    }
+  }
+
+  /**
    * @param {string | number} pluginEntryId
    * @param {{ status?: string }} context
    * @returns {Promise<{ pluginEntryId: string, success: boolean, error?: string }>}
@@ -1068,7 +1094,11 @@ class MangaBakaAPIWrapper {
   async _subscribeOne(pluginEntryId, context) {
     try {
       const authHeaders = this._authHeaders();
-      const status = context && typeof context.status === 'string' ? context.status : undefined;
+      const localStatus = context && typeof context.status === 'string' ? context.status : undefined;
+      const nativeStatus = localStatus ? this._resolveNativeStatus(localStatus) : undefined;
+      if (localStatus && !nativeStatus) {
+        throw new Error(`No native MangaBaka state for local status '${localStatus}'`);
+      }
       const endpoint = this._resolveEndpoint('api.endpoints.myLibraryEntry.template', { series_id: pluginEntryId });
       // Field name confirmed live via GET /v1/my/library's own row shape
       // (`state`, not `status`). ASSUMPTION still open: PATCH with { state }
@@ -1076,7 +1106,7 @@ class MangaBakaAPIWrapper {
       // If MangaBaka instead requires POST to /v1/my/library with
       // { series_id, state } for new entries, split this into an existence
       // check + POST/PATCH branch once verified live.
-      await this.httpClient.patch(endpoint, { state: status }, {
+      await this.httpClient.patch(endpoint, { state: nativeStatus }, {
         headers: { ...authHeaders, 'Content-Type': 'application/json' },
       });
       return { pluginEntryId: String(pluginEntryId), success: true };
@@ -1087,9 +1117,9 @@ class MangaBakaAPIWrapper {
 
   /**
    * host-capability-contract.md §2.1 — subscribe.add's array-shaped subscribe().
-   * `status` is the resolved target value, supplied by the host via
-   * syncOptions.statusVocabulary — currently all-null pending live verification
-   * of MangaBaka's native library status strings (see plugin-package.json).
+   * `status` arrives as the host's raw local enum value (e.g. 'PLAN_TO_READ'),
+   * NOT pre-resolved to a native value — see `_resolveNativeStatus()`'s own
+   * doc comment for why. `_subscribeOne` does the local->native translation.
    * @param {Array<{ pluginEntryId: string, status?: string }>} entries
    * @returns {Promise<Array<{ pluginEntryId: string, success: boolean, error?: string }>>}
    */

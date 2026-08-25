@@ -61,11 +61,11 @@ async function createWrapper(httpClient, cacheAdapter) {
   return wrapper;
 }
 
-test('pullProgress - maps a found library entry to PluginProgressDTO', async () => {
+test('pullProgress - maps a found library entry to PluginProgressDTO (real field names confirmed live 2026-08-24)', async () => {
   const { client, hooks } = createMockHttpClient();
   hooks.getHandler = (url) => {
     if (url.includes('/my/library/7')) {
-      return { data: { data: { series_id: 7, status: 'reading', chapter: 12, volume: 2, rating: 8.5, updated_at: '2026-08-01T00:00:00.000Z' } } };
+      return { data: { data: { series_id: 7, state: 'reading', progress_chapter: 12, progress_volume: 2, rating: 8.5 } } };
     }
     return { data: null };
   };
@@ -112,21 +112,28 @@ test('pushProgress - array in, array out, per-entry failure never a whole-batch 
   assert.match(results[1].error, /boom/);
 });
 
-test('pushProgress - never sends status, only chapter/volume/rating', async () => {
+test('pushProgress - never sends status, only progress_chapter/progress_volume/rating (real field names)', async () => {
   const { client, hooks } = createMockHttpClient();
   const wrapper = await createWrapper(client, createMockCacheAdapter());
 
   await wrapper.pushProgress([{ pluginEntryId: 1, chapter: 5, volume: 1, rating: 9 }]);
 
   assert.equal(hooks.patchCalls.length, 1);
-  assert.deepEqual(hooks.patchCalls[0].body, { chapter: 5, volume: 1, rating: 9 });
+  assert.deepEqual(hooks.patchCalls[0].body, { progress_chapter: 5, progress_volume: 1, rating: 9 });
 });
 
 test('getReadingList - maps the full library and caches it userScoped (real dispatch name, not sync.list\'s documented pullList)', async () => {
   const { client, hooks } = createMockHttpClient();
   hooks.getHandler = (url) => {
     if (url.includes('/my/library')) {
-      return { data: { data: [{ series_id: 1, status: 'reading', chapter: 3 }, { series_id: 2, status: 'completed', chapter: 40 }] } };
+      return {
+        data: {
+          data: [
+            { series_id: 1, state: 'reading', progress_chapter: 3, Series: { id: 1, title: 'Title One' } },
+            { series_id: 2, state: 'completed', progress_chapter: 40, Series: { id: 2, title: 'Title Two' } },
+          ],
+        },
+      };
     }
     return { data: null };
   };
@@ -138,6 +145,7 @@ test('getReadingList - maps the full library and caches it userScoped (real disp
 
   assert.equal(list.length, 2);
   assert.equal(list[0].pluginEntryId, '1');
+  assert.equal(list[0].title, 'Title One');
   assert.equal(list[0].status, 'reading');
   assert.equal(list[0].chapter, 3);
   assert.equal(list[1].pluginEntryId, '2');
@@ -147,7 +155,7 @@ test('getReadingList - computes a per-row comparison when options.hostProgressBy
   const { client, hooks } = createMockHttpClient();
   hooks.getHandler = (url) => {
     if (url.includes('/my/library')) {
-      return { data: { data: [{ series_id: 1, status: 'completed', chapter: 40, rating: 9 }] } };
+      return { data: { data: [{ series_id: 1, state: 'completed', progress_chapter: 40, rating: 9 }] } };
     }
     return { data: null };
   };

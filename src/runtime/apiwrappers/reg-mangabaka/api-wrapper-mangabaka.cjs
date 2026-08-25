@@ -759,13 +759,49 @@ class MangaBakaAPIWrapper {
   }
 
   // ---------------------------------------------------------------------
-  // sync.pull / sync.push / sync.list — ASSUMPTION-marked (see
-  // docs/plugins/mangabaka/architecture.md and mangabaka-api-settings.definition.json's
-  // api.endpoints.myLibrary*/description fields): /v1/my/library is confirmed to
-  // exist and require auth, but its exact request/response shape has not been
-  // verified against a real account. Correct via
-  // scripts/run-library-integration-test.cjs before relying on these in production.
+  // sync.pull / sync.push / sync.list
+  //
+  // GET /v1/my/library's row shape is CONFIRMED live 2026-08-24 (real account,
+  // 2 entries): a flat library row — { id, series_id, state, priority, rating,
+  // progress_chapter, progress_volume, note, read_link, is_private,
+  // number_of_rereads, start_date, finish_date, Entries: [], Series: {...} } —
+  // where `Series` nests the same object /v1/series/{id} returns. `state`'s
+  // one observed value is `"plan_to_read"`.
+  //
+  // The single-entry GET/PATCH/DELETE endpoint (`/v1/my/library/${series_id}`)
+  // itself is still an ASSUMPTION — only the list endpoint has been exercised
+  // live. It's modeled to return/accept the same row shape as the list
+  // endpoint's own rows, which is a reasonable inference but not yet confirmed
+  // — verify before relying on subscribe/push in production.
   // ---------------------------------------------------------------------
+
+  /**
+   * Normalizes one raw `/v1/my/library` row (list or, assumed, single-entry
+   * shape) into the shape every sync.* / subscribe.* method returns.
+   * @param {Record<string, unknown> | null} row
+   * @returns {{ pluginEntryId: string, title: string | null, canonicalUrl: string | null, status: string | null, rating: number | null, chapter: number | null, volume: number | null, listId: number | null, priority: number | null, lastUpdated: string | null } | null}
+   */
+  _mapLibraryRow(row) {
+    if (!row || typeof row !== 'object') return null;
+    /** @type {Record<string, unknown> | null} */
+    const series = row.Series && typeof row.Series === 'object' ? /** @type {any} */ (row.Series) : null;
+    const pluginEntryId = String(row.series_id ?? (series && series.id) ?? row.id);
+    return {
+      pluginEntryId,
+      title: series && typeof series.title === 'string' ? series.title : null,
+      canonicalUrl: `https://mangabaka.org/${pluginEntryId}`,
+      status: typeof row.state === 'string' ? row.state : null,
+      rating: typeof row.rating === 'number' ? row.rating : null,
+      chapter: typeof row.progress_chapter === 'number' ? row.progress_chapter : null,
+      volume: typeof row.progress_volume === 'number' ? row.progress_volume : null,
+      listId: typeof row.id === 'number' ? row.id : null,
+      priority: typeof row.priority === 'number' ? row.priority : null,
+      // No per-entry timestamp confirmed on the library row itself (unlike
+      // Series.last_updated_at, which describes the shared metadata, not this
+      // user's own list entry).
+      lastUpdated: null,
+    };
+  }
 
   /**
    * @param {string | number} seriesId
@@ -801,15 +837,16 @@ class MangaBakaAPIWrapper {
    */
   async pullProgress(pluginEntryId) {
     const entry = await this._fetchLibraryEntry(pluginEntryId);
-    if (!entry) {
+    const mapped = this._mapLibraryRow(entry);
+    if (!mapped) {
       return { readingStatus: null, chapter: null, volume: null, rating: null };
     }
     return {
-      readingStatus: typeof entry.status === 'string' ? entry.status : null,
-      chapter: typeof entry.chapter === 'number' ? entry.chapter : null,
-      volume: typeof entry.volume === 'number' ? entry.volume : null,
-      rating: typeof entry.rating === 'number' ? entry.rating : null,
-      lastUpdated: typeof entry.updated_at === 'string' ? entry.updated_at : null,
+      readingStatus: mapped.status,
+      chapter: mapped.chapter,
+      volume: mapped.volume,
+      rating: mapped.rating,
+      lastUpdated: mapped.lastUpdated,
     };
   }
 
@@ -822,9 +859,12 @@ class MangaBakaAPIWrapper {
     try {
       const authHeaders = this._authHeaders();
       const endpoint = this._resolveEndpoint('api.endpoints.myLibraryEntry.template', { series_id: pluginEntryId });
+      // Field names confirmed live via GET /v1/my/library's own row shape
+      // (progress_chapter/progress_volume/rating); the PATCH endpoint itself
+      // is still an ASSUMPTION — verify it accepts these before relying on it.
       const payload = {};
-      if (typeof progress.chapter === 'number') payload.chapter = progress.chapter;
-      if (typeof progress.volume === 'number') payload.volume = progress.volume;
+      if (typeof progress.chapter === 'number') payload.progress_chapter = progress.chapter;
+      if (typeof progress.volume === 'number') payload.progress_volume = progress.volume;
       if (typeof progress.rating === 'number') payload.rating = progress.rating;
 
       await this.httpClient.patch(endpoint, payload, {
@@ -901,30 +941,15 @@ class MangaBakaAPIWrapper {
       : null;
 
     const results = rows.map((row) => {
-      const pluginEntryId = String(row.series_id ?? row.id);
-      const status = typeof row.status === 'string' ? row.status : null;
-      const chapter = typeof row.chapter === 'number' ? row.chapter : null;
-      const rating = typeof row.rating === 'number' ? row.rating : null;
-
-      const hostProgress = hostProgressByEntryId ? hostProgressByEntryId.get(pluginEntryId) : null;
+      const mapped = this._mapLibraryRow(row);
+      if (!mapped) return null;
+      const hostProgress = hostProgressByEntryId ? hostProgressByEntryId.get(mapped.pluginEntryId) : null;
       const comparison = hostProgress
-        ? this.compareProgress(hostProgress, { readingStatus: status, chapter, rating })
+        ? this.compareProgress(hostProgress, { readingStatus: mapped.status, chapter: mapped.chapter, rating: mapped.rating })
         : null;
 
-      return {
-        pluginEntryId,
-        title: null,
-        canonicalUrl: null,
-        status,
-        rating,
-        chapter,
-        volume: typeof row.volume === 'number' ? row.volume : null,
-        listId: null,
-        priority: null,
-        lastUpdated: typeof row.updated_at === 'string' ? row.updated_at : null,
-        comparison,
-      };
-    });
+      return { ...mapped, comparison };
+    }).filter((entry) => entry !== null);
 
     await this._setJSONCacheValue(cacheKey, results, ttl, { userScoped: true });
     return results;
@@ -981,11 +1006,13 @@ class MangaBakaAPIWrapper {
       const authHeaders = this._authHeaders();
       const status = context && typeof context.status === 'string' ? context.status : undefined;
       const endpoint = this._resolveEndpoint('api.endpoints.myLibraryEntry.template', { series_id: pluginEntryId });
-      // ASSUMPTION: PATCH with { status } both adds a new entry and updates an
-      // existing one (idempotent upsert). If MangaBaka instead requires POST
-      // to /v1/my/library with { series_id, status } for new entries, split
-      // this into an existence check + POST/PATCH branch once verified live.
-      await this.httpClient.patch(endpoint, { status }, {
+      // Field name confirmed live via GET /v1/my/library's own row shape
+      // (`state`, not `status`). ASSUMPTION still open: PATCH with { state }
+      // both adds a new entry and updates an existing one (idempotent upsert).
+      // If MangaBaka instead requires POST to /v1/my/library with
+      // { series_id, state } for new entries, split this into an existence
+      // check + POST/PATCH branch once verified live.
+      await this.httpClient.patch(endpoint, { state: status }, {
         headers: { ...authHeaders, 'Content-Type': 'application/json' },
       });
       return { pluginEntryId: String(pluginEntryId), success: true };

@@ -68,6 +68,12 @@ test(
     assert.equal(valid, true, 'testCredentials() should succeed with a real Personal Access Token');
     process.stdout.write('[library-test] Token validated against GET /v1/my/profile.\n');
 
+    process.stdout.write('[library-test] Fetching the RAW GET /v1/my/library response (bypassing getReadingList()\'s\n');
+    process.stdout.write('[library-test] field mapping entirely) to see MangaBaka\'s actual field names...\n');
+    const rawEndpoint = wrapper._resolveEndpoint('api.endpoints.myLibrary.template');
+    const rawResponse = await wrapper.httpClient.get(rawEndpoint, { headers: wrapper._authHeaders() });
+    process.stdout.write(`[library-test] RAW /v1/my/library response: ${JSON.stringify(rawResponse.data, null, 2)}\n\n`);
+
     process.stdout.write('[library-test] Fetching GET /v1/my/library via getReadingList()...\n');
     process.stdout.write('[library-test] NOTE: getReadingList()/pullProgress() encode ASSUMPTIONS about the\n');
     process.stdout.write('[library-test] response shape (see docs/plugins/mangabaka/architecture.md) — a\n');

@@ -73,10 +73,34 @@ test('pullProgress - maps a found library entry to PluginProgressDTO (real field
   const wrapper = await createWrapper(client, createMockCacheAdapter());
   const progress = await wrapper.pullProgress(7);
 
-  assert.equal(progress.readingStatus, 'reading');
+  // readingStatus is the LOCAL enum value, not MangaBaka's raw native `state`
+  // — _mapNativeLibraryStatusToLocal() does that translation (pull direction
+  // of tracker-template.md §6's two-layer mapping pattern).
+  assert.equal(progress.readingStatus, 'READING');
   assert.equal(progress.chapter, 12);
   assert.equal(progress.volume, 2);
   assert.equal(progress.rating, 8.5);
+});
+
+test('pullProgress - collapses both "plan_to_read" and "considering" to local PLAN_TO_READ', async () => {
+  const { client, hooks } = createMockHttpClient();
+  hooks.getHandler = (url) => {
+    if (url.includes('/my/library/1')) return { data: { data: { series_id: 1, state: 'plan_to_read' } } };
+    if (url.includes('/my/library/2')) return { data: { data: { series_id: 2, state: 'considering' } } };
+    return { data: null };
+  };
+
+  const wrapper = await createWrapper(client, createMockCacheAdapter());
+  assert.equal((await wrapper.pullProgress(1)).readingStatus, 'PLAN_TO_READ');
+  assert.equal((await wrapper.pullProgress(2)).readingStatus, 'PLAN_TO_READ');
+});
+
+test('pullProgress - maps rereading (no underscore) to local RE_READING', async () => {
+  const { client, hooks } = createMockHttpClient();
+  hooks.getHandler = (url) => (url.includes('/my/library/3') ? { data: { data: { series_id: 3, state: 'rereading' } } } : { data: null });
+
+  const wrapper = await createWrapper(client, createMockCacheAdapter());
+  assert.equal((await wrapper.pullProgress(3)).readingStatus, 'RE_READING');
 });
 
 test('pullProgress - returns all-null DTO when the entry does not exist (404)', async () => {
@@ -146,7 +170,7 @@ test('getReadingList - maps the full library and caches it userScoped (real disp
   assert.equal(list.length, 2);
   assert.equal(list[0].pluginEntryId, '1');
   assert.equal(list[0].title, 'Title One');
-  assert.equal(list[0].status, 'reading');
+  assert.equal(list[0].status, 'READING');
   assert.equal(list[0].chapter, 3);
   assert.equal(list[1].pluginEntryId, '2');
 });
@@ -161,7 +185,7 @@ test('getReadingList - computes a per-row comparison when options.hostProgressBy
   };
 
   const wrapper = await createWrapper(client, createMockCacheAdapter());
-  const hostProgressByEntryId = new Map([['1', { readingStatus: 'reading', chapter: 30, rating: 8 }]]);
+  const hostProgressByEntryId = new Map([['1', { readingStatus: 'READING', chapter: 30, rating: 8 }]]);
   const list = await wrapper.getReadingList({ hostProgressByEntryId });
 
   assert.equal(list[0].comparison.chapterAhead, true);

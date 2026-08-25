@@ -76,7 +76,7 @@ test('search - maps MangaBaka search response to PluginSearchResult[]', async ()
   assert.equal(results.length, 1);
   assert.equal(results[0].pluginEntryId, '1');
   assert.equal(results[0].title, 'DICE');
-  assert.deepEqual(results[0].altTitles, ['Dice - The Cube that Changes Everything']);
+  assert.deepEqual(results[0].altTitles, ['다이스', 'Dice - The Cube that Changes Everything']);
   assert.equal(results[0].coverUrl, 'https://images.mangabaka.dev/full.jpg');
   assert.equal(results[0].seriesStatus, 'completed');
 });

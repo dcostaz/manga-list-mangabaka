@@ -12,12 +12,12 @@
   "syncOptions": {
     "searchRequiresAuth": false,
     "statusVocabulary": {
-      "READING":      null,
-      "COMPLETED":    null,
-      "PLAN_TO_READ": null,
-      "ON_HOLD":      null,
-      "DROPPED":      null,
-      "RE_READING":   null
+      "READING":      "reading",
+      "COMPLETED":    "completed",
+      "PLAN_TO_READ": "plan_to_read",
+      "ON_HOLD":      "on_hold",
+      "DROPPED":      "dropped",
+      "RE_READING":   "rereading"
     },
     "supportedActions": []
   }

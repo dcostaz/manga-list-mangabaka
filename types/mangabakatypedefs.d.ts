@@ -79,6 +79,7 @@ export interface MangaBakaRawSeries {
   native_title?: string | null;
   romanized_title?: string | null;
   secondary_titles?: Record<string, Array<{ type: string; title: string; note?: string | null }>>;
+  titles?: Array<{ language: string; traits: string[]; title: string; note?: string | null; is_primary: boolean }>;
   cover?: MangaBakaRawCover | null;
   authors?: string[];
   artists?: string[];

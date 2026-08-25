@@ -439,6 +439,45 @@ class MangaBakaAPIWrapper {
   }
 
   /**
+   * Maps a `/v1/my/library` row's native `state` value back to the local
+   * reading-status enum — the pull-direction half of `tracker-template.md`
+   * §6's two-layer mapping pattern (push direction is `subscribe()`'s
+   * `context.status`, which the host has already resolved via
+   * `plugin-package.json`'s `syncOptions.statusVocabulary` before it ever
+   * reaches the plugin).
+   *
+   * MangaBaka has more native states than manga-list's 6-value local enum —
+   * confirmed live 2026-08-25 (real account, 7 distinct states): `reading`,
+   * `completed`, `plan_to_read`, `considering`, `on_hold`, `dropped`,
+   * `rereading`. `considering` has no separate local bucket — per the
+   * account owner, it's equivalent to Plan to Read — so both `plan_to_read`
+   * and `considering` collapse to local `PLAN_TO_READ` here. Push only ever
+   * writes `plan_to_read` for that local status (statusVocabulary's own
+   * single canonical value), never `considering` — this reverse map is pull
+   * -only and is intentionally not just `statusVocabulary` inverted.
+   *
+   * Confirmed live: `reading`, `plan_to_read`, `considering`, `rereading`
+   * (note: `rereading` has no underscore, unlike `plan_to_read` — the naming
+   * isn't a single uniform convention). `completed`/`on_hold`/`dropped` are
+   * pattern-inferred from those four (single-word concepts unspaced,
+   * multi-word concepts underscored) but not independently spelling-confirmed.
+   * @param {string | null} nativeState
+   * @returns {string | null}
+   */
+  _mapNativeLibraryStatusToLocal(nativeState) {
+    switch (nativeState) {
+      case 'reading': return 'READING';
+      case 'completed': return 'COMPLETED';
+      case 'plan_to_read':
+      case 'considering': return 'PLAN_TO_READ';
+      case 'on_hold': return 'ON_HOLD';
+      case 'dropped': return 'DROPPED';
+      case 'rereading': return 'RE_READING';
+      default: return null;
+    }
+  }
+
+  /**
    * @param {MangaBakaRawSeries | null} raw
    * @returns {string | null}
    */
@@ -453,24 +492,49 @@ class MangaBakaAPIWrapper {
   }
 
   /**
-   * Flattens MangaBaka's `secondary_titles` (an object keyed by language/type)
-   * into a plain list of alt-title strings.
+   * Collects alt titles from every source MangaBaka's series shape carries —
+   * `native_title`/`romanized_title` (top-level, always present when known),
+   * the richer `titles[]` array (per-language, `is_primary`/`traits` flagged),
+   * and `secondary_titles` (flat, `type: "unknown"` fallback bucket) — since
+   * a given series may populate some of these but not others (confirmed live
+   * 2026-08-24: `secondary_titles` sometimes duplicates `native_title`/
+   * `romanized_title` verbatim, sometimes doesn't). Deduplicated, and the
+   * series' own primary `title` is excluded so it doesn't appear in its own
+   * alt-titles list.
    * @param {MangaBakaRawSeries | null} raw
    * @returns {string[]}
    */
   _extractAltTitles(raw) {
-    const secondary = raw && typeof raw === 'object' ? raw.secondary_titles : null;
-    if (!secondary || typeof secondary !== 'object') return [];
-    const titles = [];
-    for (const entries of Object.values(secondary)) {
-      if (!Array.isArray(entries)) continue;
-      for (const entry of entries) {
+    if (!raw || typeof raw !== 'object') return [];
+    const primary = typeof raw.title === 'string' ? raw.title.trim() : '';
+    /** @type {string[]} */
+    const candidates = [];
+
+    if (typeof raw.native_title === 'string' && raw.native_title.trim()) candidates.push(raw.native_title.trim());
+    if (typeof raw.romanized_title === 'string' && raw.romanized_title.trim()) candidates.push(raw.romanized_title.trim());
+
+    if (Array.isArray(raw.titles)) {
+      for (const entry of raw.titles) {
         if (entry && typeof entry.title === 'string' && entry.title.trim()) {
-          titles.push(entry.title.trim());
+          candidates.push(entry.title.trim());
         }
       }
     }
-    return [...new Set(titles)];
+
+    const secondary = raw.secondary_titles;
+    if (secondary && typeof secondary === 'object') {
+      for (const entries of Object.values(secondary)) {
+        if (!Array.isArray(entries)) continue;
+        for (const entry of entries) {
+          if (entry && typeof entry.title === 'string' && entry.title.trim()) {
+            candidates.push(entry.title.trim());
+          }
+        }
+      }
+    }
+
+    const deduped = [...new Set(candidates)];
+    return primary ? deduped.filter((title) => title !== primary) : deduped;
   }
 
   /**
@@ -790,7 +854,7 @@ class MangaBakaAPIWrapper {
       pluginEntryId,
       title: series && typeof series.title === 'string' ? series.title : null,
       canonicalUrl: `https://mangabaka.org/${pluginEntryId}`,
-      status: typeof row.state === 'string' ? row.state : null,
+      status: this._mapNativeLibraryStatusToLocal(typeof row.state === 'string' ? row.state : null),
       rating: typeof row.rating === 'number' ? row.rating : null,
       chapter: typeof row.progress_chapter === 'number' ? row.progress_chapter : null,
       volume: typeof row.progress_volume === 'number' ? row.progress_volume : null,

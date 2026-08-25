@@ -478,17 +478,17 @@ class MangaBakaAPIWrapper {
   }
 
   /**
+   * `cover.x150`/`x250`/`x350` are not alternate images — confirmed live 2026-08-25 by decoding
+   * their imgproxy URLs, which base64-encode `cover.raw.url` itself as their source path. They're
+   * generated proxies of the one master image, not independently populated fields, so there is no
+   * real case where one of them exists while `raw` doesn't — `raw.url` is the only real source.
    * @param {MangaBakaRawSeries | null} raw
    * @returns {string | null}
    */
   _extractCoverUrl(raw) {
     const cover = raw && typeof raw === 'object' ? raw.cover : null;
     if (!cover || typeof cover !== 'object') return null;
-    if (cover.raw && typeof cover.raw.url === 'string') return cover.raw.url;
-    if (cover.x350 && typeof cover.x350.x1 === 'string') return cover.x350.x1;
-    if (cover.x250 && typeof cover.x250.x1 === 'string') return cover.x250.x1;
-    if (cover.x150 && typeof cover.x150.x1 === 'string') return cover.x150.x1;
-    return null;
+    return cover.raw && typeof cover.raw.url === 'string' ? cover.raw.url : null;
   }
 
   /**

@@ -52,7 +52,6 @@ function createFallbackHttpClient() {
     get: async () => { throw new Error('HTTP client is not configured for MangaBaka runtime wrapper.'); },
     post: async () => { throw new Error('HTTP client is not configured for MangaBaka runtime wrapper.'); },
     patch: async () => { throw new Error('HTTP client is not configured for MangaBaka runtime wrapper.'); },
-    put: async () => { throw new Error('HTTP client is not configured for MangaBaka runtime wrapper.'); },
     delete: async () => { throw new Error('HTTP client is not configured for MangaBaka runtime wrapper.'); },
   };
 }
@@ -1106,12 +1105,14 @@ class MangaBakaAPIWrapper {
       // (`state`, not `status`). PATCH is NOT an upsert — confirmed live
       // 2026-08-26 via a real 404 clicking "Join List" on a series never
       // before added to the account's library: PATCH only updates an
-      // existing entry. The create mechanism is PUT on the SAME per-entry
-      // endpoint (not POST to the list — that was tried first and got a
-      // real 405 Method Not Allowed) — confirmed 2026-08-27 via MangaBaka's
-      // own internal API tester. A 404 on PATCH falls back to PUT; any
-      // other failure (network, 400, 401, ...) propagates unchanged, never
-      // masked by the fallback.
+      // existing entry. The create mechanism is POST on the SAME per-entry
+      // endpoint (not the list endpoint — POST there got a real 405 Method
+      // Not Allowed; a PUT-on-the-entry-endpoint guess in between also
+      // turned out wrong) — confirmed 2026-08-27 via MangaBaka's own
+      // internal API tester: `POST /v1/my/library/{series_id}` with body
+      // `{ state }`. A 404 on PATCH falls back to POST; any other failure
+      // (network, 400, 401, ...) propagates unchanged, never masked by the
+      // fallback.
       try {
         await this.httpClient.patch(entryEndpoint, { state: nativeStatus }, {
           headers: { ...authHeaders, 'Content-Type': 'application/json' },
@@ -1121,7 +1122,7 @@ class MangaBakaAPIWrapper {
           ? /** @type {any} */ (patchError).response.status
           : null;
         if (status !== 404) throw patchError;
-        await this.httpClient.put(entryEndpoint, { state: nativeStatus }, {
+        await this.httpClient.post(entryEndpoint, { state: nativeStatus }, {
           headers: { ...authHeaders, 'Content-Type': 'application/json' },
         });
       }

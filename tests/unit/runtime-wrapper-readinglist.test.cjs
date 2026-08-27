@@ -18,9 +18,10 @@ function createMockCacheAdapter() {
 
 function createMockHttpClient() {
   const hooks = {
-    getCalls: [], patchCalls: [], deleteCalls: [],
+    getCalls: [], patchCalls: [], postCalls: [], deleteCalls: [],
     getHandler: () => ({ data: null }),
     patchHandler: () => ({ data: {} }),
+    postHandler: () => ({ data: {} }),
     deleteHandler: () => ({ data: {} }),
   };
   const client = {
@@ -34,6 +35,12 @@ function createMockHttpClient() {
     async patch(url, body, config) {
       hooks.patchCalls.push({ url, body, config });
       const result = hooks.patchHandler(url, body, config);
+      if (result && result.throw) throw result.throw;
+      return result;
+    },
+    async post(url, body, config) {
+      hooks.postCalls.push({ url, body, config });
+      const result = hooks.postHandler(url, body, config);
       if (result && result.throw) throw result.throw;
       return result;
     },
@@ -228,6 +235,34 @@ test('subscribe - fails cleanly (never sends the raw local string) for an unreco
 
   assert.equal(result.success, false);
   assert.match(result.error, /No native MangaBaka state/);
+});
+
+test('subscribe - PATCH 404 (series never added before) falls back to POST /my/library to create it (real bug: PATCH is not an upsert, confirmed live 2026-08-26)', async () => {
+  const { client, hooks } = createMockHttpClient();
+  const notFound = new Error('Not Found');
+  notFound.response = { status: 404 };
+  hooks.patchHandler = () => ({ throw: notFound });
+
+  const wrapper = await createWrapper(client, createMockCacheAdapter());
+  const [result] = await wrapper.subscribe([{ pluginEntryId: 42, status: 'READING' }]);
+
+  assert.equal(result.success, true);
+  assert.equal(hooks.postCalls.length, 1);
+  assert.match(hooks.postCalls[0].url, /\/my\/library$/);
+  assert.deepEqual(hooks.postCalls[0].body, { series_id: 42, state: 'reading' });
+});
+
+test('subscribe - a non-404 PATCH failure propagates without ever attempting POST', async () => {
+  const { client, hooks } = createMockHttpClient();
+  const serverError = new Error('Internal Server Error');
+  serverError.response = { status: 500 };
+  hooks.patchHandler = () => ({ throw: serverError });
+
+  const wrapper = await createWrapper(client, createMockCacheAdapter());
+  const [result] = await wrapper.subscribe([{ pluginEntryId: 42, status: 'READING' }]);
+
+  assert.equal(result.success, false);
+  assert.equal(hooks.postCalls.length, 0);
 });
 
 test('unsubscribe - idempotent: a 404 on an already-absent entry is still success', async () => {

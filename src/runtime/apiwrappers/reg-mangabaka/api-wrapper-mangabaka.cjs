@@ -1100,16 +1100,31 @@ class MangaBakaAPIWrapper {
       if (localStatus && !nativeStatus) {
         throw new Error(`No native MangaBaka state for local status '${localStatus}'`);
       }
-      const endpoint = this._resolveEndpoint('api.endpoints.myLibraryEntry.template', { series_id: pluginEntryId });
+      const entryEndpoint = this._resolveEndpoint('api.endpoints.myLibraryEntry.template', { series_id: pluginEntryId });
       // Field name confirmed live via GET /v1/my/library's own row shape
-      // (`state`, not `status`). ASSUMPTION still open: PATCH with { state }
-      // both adds a new entry and updates an existing one (idempotent upsert).
-      // If MangaBaka instead requires POST to /v1/my/library with
-      // { series_id, state } for new entries, split this into an existence
-      // check + POST/PATCH branch once verified live.
-      await this.httpClient.patch(endpoint, { state: nativeStatus }, {
-        headers: { ...authHeaders, 'Content-Type': 'application/json' },
-      });
+      // (`state`, not `status`). PATCH is NOT an upsert — confirmed live
+      // 2026-08-26 via a real 404 clicking "Join List" on a series never
+      // before added to the account's library: PATCH only updates an
+      // existing entry. A 404 here falls back to POST /v1/my/library (the
+      // list endpoint, not the per-entry one) with { series_id, state } to
+      // create it — the shape this code's own prior ASSUMPTION comment
+      // already anticipated needing, now exercised for real. Any other
+      // failure (network, 400, 401, ...) propagates unchanged, never masked
+      // by the fallback.
+      try {
+        await this.httpClient.patch(entryEndpoint, { state: nativeStatus }, {
+          headers: { ...authHeaders, 'Content-Type': 'application/json' },
+        });
+      } catch (patchError) {
+        const status = patchError && /** @type {any} */ (patchError).response && typeof (/** @type {any} */ (patchError).response.status) === 'number'
+          ? /** @type {any} */ (patchError).response.status
+          : null;
+        if (status !== 404) throw patchError;
+        const listEndpoint = this._resolveEndpoint('api.endpoints.myLibrary.template', {});
+        await this.httpClient.post(listEndpoint, { series_id: Number(pluginEntryId), state: nativeStatus }, {
+          headers: { ...authHeaders, 'Content-Type': 'application/json' },
+        });
+      }
       return { pluginEntryId: String(pluginEntryId), success: true };
     } catch (error) {
       return { pluginEntryId: String(pluginEntryId), success: false, error: error instanceof Error ? error.message : String(error) };

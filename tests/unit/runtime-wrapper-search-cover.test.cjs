@@ -252,3 +252,30 @@ test('getSeriesUrl - resolves the canonical mangabaka.org page for a series id',
   assert.equal(await wrapper.getSeriesUrl(1), 'https://mangabaka.org/1');
   assert.equal(await wrapper.getSeriesUrl('not-a-number'), null);
 });
+
+test('queryLive - plugin.live: found series returns ok with a stat-grid + link-list section', async () => {
+  const { client, hooks } = createMockHttpClient();
+  hooks.getHandler = (url) => (url.includes('/series/1') ? { data: { status: 200, data: DICE_SERIES } } : { data: null });
+
+  const wrapper = await createWrapper(client);
+  const result = await wrapper.queryLive(1);
+
+  assert.equal(result.status, 'ok');
+  assert.equal(result.data.pluginEntryId, '1');
+  assert.equal(result.data.displayTitle, 'DICE');
+  assert.equal(result.data.linkState, 'active');
+  assert.equal(typeof result.data.fetchedAt, 'string');
+  const statGrid = result.data.sections.find((s) => s.type === 'stat-grid');
+  assert.equal(statGrid.fields['Type'], 'manhwa');
+  assert.equal(statGrid.fields['Year'], 2013);
+  const linkList = result.data.sections.find((s) => s.type === 'link-list');
+  assert.equal(linkList.links[0].url, 'https://mangabaka.org/1');
+});
+
+test('queryLive - plugin.live: series not found (e.g. removed/merged) reports not_found, never a thrown error', async () => {
+  const { client } = createMockHttpClient();
+  const wrapper = await createWrapper(client);
+
+  const result = await wrapper.queryLive(999);
+  assert.deepEqual(result, { status: 'not_found' });
+});

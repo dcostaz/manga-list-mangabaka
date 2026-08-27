@@ -231,6 +231,7 @@ class MangaBakaAPIWrapper {
     return /** @type {string[]} */ (Object.freeze([
       'credential', 'search.query', 'search.lookup', 'enrich', 'enrich.cover',
       'sync.pull', 'sync.push', 'sync.list', 'subscribe.add', 'subscribe.remove',
+      'plugin.live',
     ]));
   }
 
@@ -1169,6 +1170,66 @@ class MangaBakaAPIWrapper {
       results.push(await this._unsubscribeOne(id));
     }
     return results;
+  }
+
+  // ---------------------------------------------------------------------
+  // plugin.live — badge freshness (PluginBadgeDelegate) and Sync Management's
+  // "Full Scan" (syncmanagementdelegate.cjs's supportsFullScan) both gate on
+  // this capability being declared; getReadingList() already backs Full Scan
+  // on its own, but a plugin claiming plugin.live without a real queryLive()
+  // would leave the single-entry "verify link liveness" check permanently
+  // reporting 'unverified'/'no-capability' despite the manifest saying
+  // otherwise (cls/mangalist.cjs's own verdict logic checks both the
+  // capability AND `typeof instance.queryLive === 'function'`). Mirrors
+  // MangaUpdates'/MangaDex's own queryLive() shape.
+  // ---------------------------------------------------------------------
+
+  /**
+   * @param {string | number} pluginEntryId
+   * @returns {Promise<{ status: 'ok', data: object } | { status: 'not_found' } | { status: 'error', message: string, retryable: boolean }>}
+   */
+  async queryLive(pluginEntryId) {
+    let raw;
+    try {
+      raw = await this._fetchSeriesDetail(pluginEntryId);
+    } catch (error) {
+      return { status: 'error', message: error instanceof Error ? error.message : String(error), retryable: true };
+    }
+    if (!raw) return { status: 'not_found' };
+
+    let seriesUrl = null;
+    try { seriesUrl = await this.getSeriesUrl(pluginEntryId); } catch { seriesUrl = null; }
+
+    const seriesStatus = this._mapSeriesStatus(raw.status);
+    const altTitles = this._extractAltTitles(raw);
+
+    return {
+      status: 'ok',
+      data: {
+        pluginEntryId: String(pluginEntryId),
+        displayTitle: typeof raw.title === 'string' ? raw.title : undefined,
+        linkState: 'active',
+        statusLabel: seriesStatus,
+        fetchedAt: new Date().toISOString(),
+        sections: [
+          {
+            type: 'stat-grid',
+            label: 'Overview',
+            fields: {
+              'Series status': seriesStatus,
+              'Type': typeof raw.type === 'string' ? raw.type : '—',
+              'Year': typeof raw.year === 'number' ? raw.year : '—',
+              'Alt titles': altTitles.length,
+            },
+          },
+          ...(seriesUrl ? [{
+            type: 'link-list',
+            label: 'Links',
+            links: [{ label: 'MangaBaka', url: seriesUrl }],
+          }] : []),
+        ],
+      },
+    };
   }
 }
 

@@ -18,10 +18,11 @@ function createMockCacheAdapter() {
 
 function createMockHttpClient() {
   const hooks = {
-    getCalls: [], patchCalls: [], postCalls: [], deleteCalls: [],
+    getCalls: [], patchCalls: [], postCalls: [], putCalls: [], deleteCalls: [],
     getHandler: () => ({ data: null }),
     patchHandler: () => ({ data: {} }),
     postHandler: () => ({ data: {} }),
+    putHandler: () => ({ data: {} }),
     deleteHandler: () => ({ data: {} }),
   };
   const client = {
@@ -41,6 +42,12 @@ function createMockHttpClient() {
     async post(url, body, config) {
       hooks.postCalls.push({ url, body, config });
       const result = hooks.postHandler(url, body, config);
+      if (result && result.throw) throw result.throw;
+      return result;
+    },
+    async put(url, body, config) {
+      hooks.putCalls.push({ url, body, config });
+      const result = hooks.putHandler(url, body, config);
       if (result && result.throw) throw result.throw;
       return result;
     },
@@ -237,7 +244,7 @@ test('subscribe - fails cleanly (never sends the raw local string) for an unreco
   assert.match(result.error, /No native MangaBaka state/);
 });
 
-test('subscribe - PATCH 404 (series never added before) falls back to POST /my/library to create it (real bug: PATCH is not an upsert, confirmed live 2026-08-26)', async () => {
+test('subscribe - PATCH 404 (series never added before) falls back to PUT on the same per-entry endpoint to create it (real bug: PATCH is not an upsert; the create mechanism is PUT, not POST to the list — confirmed live 2026-08-26/27)', async () => {
   const { client, hooks } = createMockHttpClient();
   const notFound = new Error('Not Found');
   notFound.response = { status: 404 };
@@ -247,12 +254,13 @@ test('subscribe - PATCH 404 (series never added before) falls back to POST /my/l
   const [result] = await wrapper.subscribe([{ pluginEntryId: 42, status: 'READING' }]);
 
   assert.equal(result.success, true);
-  assert.equal(hooks.postCalls.length, 1);
-  assert.match(hooks.postCalls[0].url, /\/my\/library$/);
-  assert.deepEqual(hooks.postCalls[0].body, { series_id: 42, state: 'reading' });
+  assert.equal(hooks.postCalls.length, 0);
+  assert.equal(hooks.putCalls.length, 1);
+  assert.match(hooks.putCalls[0].url, /\/my\/library\/42$/);
+  assert.deepEqual(hooks.putCalls[0].body, { state: 'reading' });
 });
 
-test('subscribe - a non-404 PATCH failure propagates without ever attempting POST', async () => {
+test('subscribe - a non-404 PATCH failure propagates without ever attempting PUT', async () => {
   const { client, hooks } = createMockHttpClient();
   const serverError = new Error('Internal Server Error');
   serverError.response = { status: 500 };
@@ -262,7 +270,7 @@ test('subscribe - a non-404 PATCH failure propagates without ever attempting POS
   const [result] = await wrapper.subscribe([{ pluginEntryId: 42, status: 'READING' }]);
 
   assert.equal(result.success, false);
-  assert.equal(hooks.postCalls.length, 0);
+  assert.equal(hooks.putCalls.length, 0);
 });
 
 test('unsubscribe - idempotent: a 404 on an already-absent entry is still success', async () => {

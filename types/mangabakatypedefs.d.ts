@@ -38,6 +38,11 @@ export interface MangaBakaHttpClientLike {
     data?: unknown,
     config?: Record<string, unknown>
   ) => Promise<MangaBakaHttpResponseLike>;
+  put: (
+    url: string,
+    data?: unknown,
+    config?: Record<string, unknown>
+  ) => Promise<MangaBakaHttpResponseLike>;
   delete: (
     url: string,
     config?: Record<string, unknown>

@@ -457,11 +457,14 @@ class MangaBakaAPIWrapper {
    * single canonical value), never `considering` — this reverse map is pull
    * -only and is intentionally not just `statusVocabulary` inverted.
    *
-   * Confirmed live: `reading`, `plan_to_read`, `considering`, `rereading`
-   * (note: `rereading` has no underscore, unlike `plan_to_read` — the naming
-   * isn't a single uniform convention). `completed`/`on_hold`/`dropped` are
-   * pattern-inferred from those four (single-word concepts unspaced,
-   * multi-word concepts underscored) but not independently spelling-confirmed.
+   * Confirmed live: `reading`, `plan_to_read`, `considering`, `rereading`,
+   * `paused`. `completed`/`dropped` are still pattern-inferred, not
+   * independently spelling-confirmed — `on_hold` was the same kind of
+   * pattern guess and was confirmed WRONG live 2026-08-27 (a real push
+   * failure); the actual native value is `paused`, unrelated to the
+   * `plan_to_read`/`rereading` underscore inconsistency this guess was
+   * based on. Treat `completed`/`dropped` with the same caution until
+   * independently confirmed.
    * @param {string | null} nativeState
    * @returns {string | null}
    */
@@ -471,7 +474,7 @@ class MangaBakaAPIWrapper {
       case 'completed': return 'COMPLETED';
       case 'plan_to_read':
       case 'considering': return 'PLAN_TO_READ';
-      case 'on_hold': return 'ON_HOLD';
+      case 'paused': return 'ON_HOLD';
       case 'dropped': return 'DROPPED';
       case 'rereading': return 'RE_READING';
       default: return null;
@@ -1072,6 +1075,11 @@ class MangaBakaAPIWrapper {
    * must do its own local->native resolution (MangaUpdates' wrapper does the
    * same via its own `statusMapping.*` settings lookup). Values here must
    * match `plugin-package.json`'s `syncOptions.statusVocabulary` exactly.
+   *
+   * `ON_HOLD` -> `paused`: confirmed live 2026-08-27 after a real push
+   * failure — the value shipped at scaffold time (`on_hold`) was a pattern
+   * guess (never independently confirmed, unlike `reading`/`plan_to_read`/
+   * `considering`/`rereading`) and was wrong.
    * @param {string} localStatus
    * @returns {string | null}
    */
@@ -1080,7 +1088,7 @@ class MangaBakaAPIWrapper {
       case 'READING': return 'reading';
       case 'COMPLETED': return 'completed';
       case 'PLAN_TO_READ': return 'plan_to_read';
-      case 'ON_HOLD': return 'on_hold';
+      case 'ON_HOLD': return 'paused';
       case 'DROPPED': return 'dropped';
       case 'RE_READING': return 'rereading';
       default: return null;

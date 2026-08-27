@@ -110,6 +110,14 @@ test('pullProgress - maps rereading (no underscore) to local RE_READING', async 
   assert.equal((await wrapper.pullProgress(3)).readingStatus, 'RE_READING');
 });
 
+test('pullProgress - maps native "paused" to local ON_HOLD (real value confirmed live 2026-08-27; "on_hold" was a wrong pattern guess)', async () => {
+  const { client, hooks } = createMockHttpClient();
+  hooks.getHandler = (url) => (url.includes('/my/library/4') ? { data: { data: { series_id: 4, state: 'paused' } } } : { data: null });
+
+  const wrapper = await createWrapper(client, createMockCacheAdapter());
+  assert.equal((await wrapper.pullProgress(4)).readingStatus, 'ON_HOLD');
+});
+
 test('pullProgress - returns all-null DTO when the entry does not exist (404)', async () => {
   const { client, hooks } = createMockHttpClient();
   const notFound = new Error('Not Found');
@@ -225,6 +233,16 @@ test('subscribe - resolves the local status enum to MangaBaka\'s native state be
 
   assert.equal(hooks.patchCalls.length, 1);
   assert.deepEqual(hooks.patchCalls[0].body, { state: 'plan_to_read' });
+});
+
+test('subscribe - resolves ON_HOLD to native "paused" (real value confirmed live 2026-08-27; "on_hold" was a wrong pattern guess that failed a real push)', async () => {
+  const { client, hooks } = createMockHttpClient();
+
+  const wrapper = await createWrapper(client, createMockCacheAdapter());
+  await wrapper.subscribe([{ pluginEntryId: 1, status: 'ON_HOLD' }]);
+
+  assert.equal(hooks.patchCalls.length, 1);
+  assert.deepEqual(hooks.patchCalls[0].body, { state: 'paused' });
 });
 
 test('subscribe - fails cleanly (never sends the raw local string) for an unrecognized status', async () => {

@@ -15,7 +15,7 @@
       "READING":      "reading",
       "COMPLETED":    "completed",
       "PLAN_TO_READ": "plan_to_read",
-      "ON_HOLD":      "on_hold",
+      "ON_HOLD":      "paused",
       "DROPPED":      "dropped",
       "RE_READING":   "rereading"
     },

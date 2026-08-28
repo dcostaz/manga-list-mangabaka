@@ -859,7 +859,10 @@ class MangaBakaAPIWrapper {
       title: series && typeof series.title === 'string' ? series.title : null,
       canonicalUrl: `https://mangabaka.org/${pluginEntryId}`,
       status: this._mapNativeLibraryStatusToLocal(typeof row.state === 'string' ? row.state : null),
-      rating: typeof row.rating === 'number' ? row.rating : null,
+      // MangaBaka's own rating scale is 0-100 (confirmed live 2026-08-27 against a real series'
+      // aggregate `rating`, e.g. 76.9175 — unambiguous on a 100-point scale) vs manga-list's 0-10
+      // `user_rating`. Converts down to the host's scale here; `_pushProgressOne` converts back up.
+      rating: typeof row.rating === 'number' ? Math.round(row.rating) / 10 : null,
       chapter: typeof row.progress_chapter === 'number' ? row.progress_chapter : null,
       volume: typeof row.progress_volume === 'number' ? row.progress_volume : null,
       listId: typeof row.id === 'number' ? row.id : null,
@@ -928,12 +931,15 @@ class MangaBakaAPIWrapper {
       const authHeaders = this._authHeaders();
       const endpoint = this._resolveEndpoint('api.endpoints.myLibraryEntry.template', { series_id: pluginEntryId });
       // Field names confirmed live via GET /v1/my/library's own row shape
-      // (progress_chapter/progress_volume/rating); the PATCH endpoint itself
-      // is still an ASSUMPTION — verify it accepts these before relying on it.
+      // (progress_chapter/progress_volume/rating); PATCH on this endpoint
+      // updating an existing entry is confirmed live too (2026-08-26/27).
       const payload = {};
       if (typeof progress.chapter === 'number') payload.progress_chapter = progress.chapter;
       if (typeof progress.volume === 'number') payload.progress_volume = progress.volume;
-      if (typeof progress.rating === 'number') payload.rating = progress.rating;
+      // Host rating is 0-10, MangaBaka's own scale is 0-100 (see _mapLibraryRow's matching
+      // comment) — convert up on push, rounding to a clean integer (host values are always
+      // single-decimal, e.g. 9.2, so *10 lands on a whole number modulo float error).
+      if (typeof progress.rating === 'number') payload.rating = Math.round(progress.rating * 10);
 
       await this.httpClient.patch(endpoint, payload, {
         headers: { ...authHeaders, 'Content-Type': 'application/json' },

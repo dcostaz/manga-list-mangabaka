@@ -72,7 +72,9 @@ test('pullProgress - maps a found library entry to PluginProgressDTO (real field
   const { client, hooks } = createMockHttpClient();
   hooks.getHandler = (url) => {
     if (url.includes('/my/library/7')) {
-      return { data: { data: { series_id: 7, state: 'reading', progress_chapter: 12, progress_volume: 2, rating: 8.5 } } };
+      // rating: 85 is MangaBaka's own 0-100 scale (confirmed live 2026-08-27) — the mapped
+      // DTO below is expected on the host's 0-10 scale, i.e. 8.5.
+      return { data: { data: { series_id: 7, state: 'reading', progress_chapter: 12, progress_volume: 2, rating: 85 } } };
     }
     return { data: null };
   };
@@ -155,10 +157,12 @@ test('pushProgress - never sends status, only progress_chapter/progress_volume/r
   const { client, hooks } = createMockHttpClient();
   const wrapper = await createWrapper(client, createMockCacheAdapter());
 
+  // Host rating (9, on the 0-10 scale) must convert up to MangaBaka's own 0-100 scale (90),
+  // confirmed live 2026-08-27 against a real series' aggregate rating.
   await wrapper.pushProgress([{ pluginEntryId: 1, chapter: 5, volume: 1, rating: 9 }]);
 
   assert.equal(hooks.patchCalls.length, 1);
-  assert.deepEqual(hooks.patchCalls[0].body, { progress_chapter: 5, progress_volume: 1, rating: 9 });
+  assert.deepEqual(hooks.patchCalls[0].body, { progress_chapter: 5, progress_volume: 1, rating: 90 });
 });
 
 test('getReadingList - maps the full library and caches it userScoped (real dispatch name, not sync.list\'s documented pullList)', async () => {
@@ -194,7 +198,9 @@ test('getReadingList - computes a per-row comparison when options.hostProgressBy
   const { client, hooks } = createMockHttpClient();
   hooks.getHandler = (url) => {
     if (url.includes('/my/library')) {
-      return { data: { data: [{ series_id: 1, state: 'completed', progress_chapter: 40, rating: 9 }] } };
+      // rating: 90 is MangaBaka's own 0-100 scale, mapping down to 9.0 on the host's 0-10 scale
+      // — still differs from the host's own 8 below.
+      return { data: { data: [{ series_id: 1, state: 'completed', progress_chapter: 40, rating: 90 }] } };
     }
     return { data: null };
   };

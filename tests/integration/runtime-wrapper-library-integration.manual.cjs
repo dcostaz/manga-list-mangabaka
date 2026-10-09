@@ -76,7 +76,7 @@ test(
 
     process.stdout.write('[library-test] Fetching GET /v1/my/library via getReadingList()...\n');
     process.stdout.write('[library-test] NOTE: getReadingList()/pullProgress() encode ASSUMPTIONS about the\n');
-    process.stdout.write('[library-test] response shape (see docs/plugins/mangabaka/architecture.md) — a\n');
+    process.stdout.write('[library-test] response shape — a\n');
     process.stdout.write('[library-test] thrown error or an empty/malformed result here is expected on\n');
     process.stdout.write('[library-test] the first real run and should drive a wrapper fix, not be treated\n');
     process.stdout.write('[library-test] as this test being broken.\n\n');

@@ -71,8 +71,7 @@ updating the package source and releasing a new runtime zip.
 | `api.endpoints.myLibraryEntry.template` | `${baseUrl}/my/library/${series_id}` | 250 | **ASSUMPTION** — get/add/update/remove a single library entry. Not directly confirmed live. |
 
 Every `ASSUMPTION`-flagged endpoint must be corrected against `npm run test:library:interactive`'s
-real output before this plugin is relied on for `sync.*`/`subscribe.*` in production. See
-`docs/plugins/mangabaka/architecture.md` in the main `manga-list` repo for the full write-up.
+real output before this plugin is relied on for `sync.*`/`subscribe.*` in production.
 
 ---
 

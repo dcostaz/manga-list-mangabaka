@@ -60,7 +60,7 @@ async function run() {
 
   process.stdout.write('[library-test-runner] Launching manual library integration test...\n');
   process.stdout.write('[library-test-runner] This test EXISTS TO VERIFY the /v1/my/library shape assumptions\n');
-  process.stdout.write('[library-test-runner] documented in docs/plugins/mangabaka/architecture.md — expect it to\n');
+  process.stdout.write('[library-test-runner] this wrapper is built on — expect it to\n');
   process.stdout.write('[library-test-runner] surface a mismatch on first real run; that is the point.\n\n');
 
   const child = spawn(

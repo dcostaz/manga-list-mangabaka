@@ -231,7 +231,7 @@ class MangaBakaAPIWrapper {
     return /** @type {string[]} */ (Object.freeze([
       'credential', 'search.query', 'search.lookup', 'enrich', 'enrich.cover',
       'sync.pull', 'sync.push', 'sync.list', 'subscribe.add', 'subscribe.remove',
-      'plugin.live',
+      'watch.entry', 'watch.list', 'watch.summary',
     ]));
   }
 
@@ -970,22 +970,11 @@ class MangaBakaAPIWrapper {
   }
 
   /**
-   * host-capability-contract.md §2's sync.list mapping documents this as `pullList()` —
-   * confirmed via grep that nothing in the host actually calls that name; the real, live
-   * dispatcher is `PluginService.getReadingListEntries()` (`cls/services/pluginservice.cjs:1746,
-   * 1757`), which requires the method to be named exactly `getReadingList` and gates on it with
-   * `typeof instance.getReadingList !== 'function'` — a plugin named to the documented contract
-   * is silently treated as not supporting a reading list at all, exactly as MangaUpdates'/
-   * MangaDex's own real `getReadingList()` methods are already named. Matching their precedent,
-   * not the doc, is what the host actually dispatches.
-   *
-   * Return shape also follows the real contract (`pluginservice.cjs:1735-1737`'s own JSDoc),
-   * not `PluginProgressDTO`: `status`/`title`/`canonicalUrl`/`listId`/`priority` fields, not
-   * `readingStatus`. `title` is `null` here — the ASSUMPTION-marked `/v1/my/library` shape isn't
-   * confirmed to carry one (see docs/plugins/mangabaka/requirements.md §5); the host's own
-   * title-drift check already no-ops when `title` isn't a non-empty string.
+   * `sync.list` and `watch.list` (host-capability-contract.md §2) -- one method, two offers.
+   * `title` is `null` here -- the `/v1/my/library` shape isn't confirmed to carry one; the
+   * host's own title-drift check already no-ops when `title` isn't a non-empty string.
    * @param {{ hostProgressByEntryId?: Map<string, object> }} [options]
-   * @returns {Promise<Array<{ pluginEntryId: string, title: string|null, canonicalUrl: string|null, status: string|null, rating: number|null, chapter: number|null, volume: number|null, listId: number|null, priority: number|null, lastUpdated: string|null, comparison: object|null }>>}
+   * @returns {Promise<import('../../../../types/plugintypedefs').PluginReadingListEntry[]>}
    */
   async getReadingList(options = {}) {
     let authHeaders;
@@ -1203,15 +1192,12 @@ class MangaBakaAPIWrapper {
   }
 
   // ---------------------------------------------------------------------
-  // plugin.live — badge freshness (PluginBadgeDelegate) and Sync Management's
-  // "Full Scan" (syncmanagementdelegate.cjs's supportsFullScan) both gate on
-  // this capability being declared; getReadingList() already backs Full Scan
-  // on its own, but a plugin claiming plugin.live without a real queryLive()
-  // would leave the single-entry "verify link liveness" check permanently
-  // reporting 'unverified'/'no-capability' despite the manifest saying
-  // otherwise (cls/mangalist.cjs's own verdict logic checks both the
-  // capability AND `typeof instance.queryLive === 'function'`). Mirrors
-  // MangaUpdates'/MangaDex's own queryLive() shape.
+  // watch.entry -- single-entry "verify link liveness" (cls/mangalist.cjs's verdict logic),
+  // distinct from watch.list, which getReadingList() above already answers (Sync Management's
+  // Full Scan gates on that declaration, not this one -- the pre-register `plugin.live` bundled
+  // both behind one tag, which is why this plugin had to declare it to get Full Scan at all even
+  // though queryLive() is the per-entry check, not the whole-list one). Mirrors MangaUpdates'/
+  // MangaDex's own queryLive() shape.
   // ---------------------------------------------------------------------
 
   /**
@@ -1260,6 +1246,58 @@ class MangaBakaAPIWrapper {
         ],
       },
     };
+  }
+
+  // ── watch.summary ──
+
+  /**
+   * Current volatile state for a host-named set of already-linked entries, in one batched call
+   * (host-capability-contract.md §2.1: array in, array out, per-entry failure, never a
+   * whole-batch throw). Reuses `getReadingList()` -- there is no bulk-by-id lookup endpoint
+   * here (MangaBaka's `/v1/my/library` returns the whole list, not a filtered one), so the
+   * whole list is fetched once (subject to `getReadingList()`'s own cache) and filtered to the
+   * requested ids, same approach MangaUpdates' `summarizeEntries()` already takes for the same
+   * reason.
+   *
+   * - **`success: true` with `linkState: 'error'`** -- this plugin ANSWERED, and the answer is
+   *   "this id isn't in the library" (removed, or never added). Mirrors FMD2's own
+   *   `summarizeEntries` convention for the same case.
+   * - **`success: false`** -- this plugin could NOT answer: the library fetch itself failed
+   *   (network, auth). The host keeps each entry's stored badge state.
+   *
+   * @param {string[]} pluginEntryIds
+   * @returns {Promise<Array<{ pluginEntryId: string, success: boolean, summary?: import('../../../../types/plugintypedefs').PluginCardSummary, error?: string }>>}
+   */
+  async summarizeEntries(pluginEntryIds) {
+    if (!Array.isArray(pluginEntryIds) || pluginEntryIds.length === 0) return [];
+
+    const ids = pluginEntryIds.map(String);
+    let entries;
+    try {
+      entries = await this.getReadingList();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      // Per-entry failure rather than a thrown batch: one failed fetch means every requested id
+      // is unanswerable, reported as such so the host keeps their stored state.
+      return ids.map((id) => ({ pluginEntryId: id, success: false, error: message }));
+    }
+
+    /** @type {Map<string, string>} */
+    const statusById = new Map();
+    for (const entry of entries) {
+      if (entry && typeof entry.pluginEntryId === 'string' && typeof entry.status === 'string') {
+        statusById.set(entry.pluginEntryId, entry.status);
+      }
+    }
+
+    return ids.map((id) => {
+      const status = statusById.get(id);
+      if (!status) {
+        return { pluginEntryId: id, success: true, summary: { linkState: 'error', label: `Entry not found: ${id}` } };
+      }
+      const label = status.replace(/_/g, ' ').toLowerCase().replace(/^./, (c) => c.toUpperCase());
+      return { pluginEntryId: id, success: true, summary: { linkState: 'active', label } };
+    });
   }
 }
 

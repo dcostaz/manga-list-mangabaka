@@ -165,7 +165,7 @@ test('pushProgress - never sends status, only progress_chapter/progress_volume/r
   assert.deepEqual(hooks.patchCalls[0].body, { progress_chapter: 5, progress_volume: 1, rating: 90 });
 });
 
-test('getReadingList - maps the full library and caches it userScoped (real dispatch name, not sync.list\'s documented pullList)', async () => {
+test('getReadingList - maps the full library and caches it userScoped', async () => {
   const { client, hooks } = createMockHttpClient();
   hooks.getHandler = (url) => {
     if (url.includes('/my/library')) {
@@ -182,8 +182,8 @@ test('getReadingList - maps the full library and caches it userScoped (real disp
   };
 
   const wrapper = await createWrapper(client, createMockCacheAdapter());
-  // cls/services/pluginservice.cjs:1746 gates on typeof instance.getReadingList === 'function' —
-  // this is the method name PluginService actually calls, not `pullList`.
+  // host-capability-contract.md §2: getReadingList() is the real name for BOTH sync.list and
+  // watch.list -- `pullList` never existed anywhere in code, only in a since-corrected doc row.
   const list = await wrapper.getReadingList();
 
   assert.equal(list.length, 2);

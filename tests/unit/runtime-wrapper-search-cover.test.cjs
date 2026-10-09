@@ -253,7 +253,7 @@ test('getSeriesUrl - resolves the canonical mangabaka.org page for a series id',
   assert.equal(await wrapper.getSeriesUrl('not-a-number'), null);
 });
 
-test('queryLive - plugin.live: found series returns ok with a stat-grid + link-list section', async () => {
+test('queryLive - watch.entry: found series returns ok with a stat-grid + link-list section', async () => {
   const { client, hooks } = createMockHttpClient();
   hooks.getHandler = (url) => (url.includes('/series/1') ? { data: { status: 200, data: DICE_SERIES } } : { data: null });
 
@@ -272,7 +272,7 @@ test('queryLive - plugin.live: found series returns ok with a stat-grid + link-l
   assert.equal(linkList.links[0].url, 'https://mangabaka.org/1');
 });
 
-test('queryLive - plugin.live: series not found (e.g. removed/merged) reports not_found, never a thrown error', async () => {
+test('queryLive - watch.entry: series not found (e.g. removed/merged) reports not_found, never a thrown error', async () => {
   const { client } = createMockHttpClient();
   const wrapper = await createWrapper(client);
 

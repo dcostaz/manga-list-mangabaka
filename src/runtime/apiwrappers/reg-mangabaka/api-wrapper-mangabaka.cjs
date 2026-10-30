@@ -571,20 +571,36 @@ class MangaBakaAPIWrapper {
   // ---------------------------------------------------------------------
 
   /**
+   * Each result carries `confidence`, how well its title (or an alternate title) matches the query, 0 to 1. A
+   * result answered from this plugin's cache says so (`cached`, and `fetchedAt` when the cache recorded it).
+   * `options.refresh` (host-capability-contract §2.4) and `options.forceRefresh` both answer from MangaBaka itself.
    * @param {string} query
-   * @param {{ forceRefresh?: boolean }} [options]
+   * @param {{ forceRefresh?: boolean, refresh?: boolean }} [options]
    * @returns {Promise<PluginSearchResult[]>}
    */
   async search(query, options = {}) {
     const q = typeof query === 'string' ? query.trim() : '';
     if (!q) return [];
 
-    const useCache = !(options && options.forceRefresh === true);
+    const useCache = !(options && (options.forceRefresh === true || options.refresh === true));
     const sanitized = this._context && this._context.utils ? this._context.utils.sanitizeForSearch(q) : q;
     const cacheKey = `mangabaka_search_${sanitized}`;
     if (useCache) {
-      const cached = await this._getJSONCacheValue(cacheKey);
-      if (cached) return /** @type {PluginSearchResult[]} */ (cached);
+      const raw = await this._getJSONCacheValue(cacheKey);
+      // Stamped with the time it was fetched; an entry cached before that was recorded is the bare list.
+      const stamped = raw && typeof raw === 'object' && !Array.isArray(raw) && /** @type {Record<string, unknown>} */ (raw)._v === 2;
+      const cached = stamped ? /** @type {{ payload?: unknown }} */ (raw).payload : raw;
+      if (Array.isArray(cached) && cached.length > 0) {
+        const fetchedAt = stamped && typeof (/** @type {{ fetchedAt?: unknown }} */ (raw)).fetchedAt === 'string'
+          ? /** @type {{ fetchedAt: string }} */ (raw).fetchedAt
+          : undefined;
+        return /** @type {PluginSearchResult[]} */ (cached).map((result) => ({
+          ...result,
+          confidence: this._matchConfidence(q, result),
+          cached: /** @type {true} */ (true),
+          ...(fetchedAt ? { fetchedAt } : {}),
+        }));
+      }
     }
 
     const endpoint = this._resolveEndpoint('api.endpoints.seriesSearch.template');
@@ -610,8 +626,48 @@ class MangaBakaAPIWrapper {
     }));
 
     const ttl = Number(this._resolveSettingValue('cache.ttl.searchResults')) || 3600;
-    await this._setJSONCacheValue(cacheKey, results, ttl);
-    return results;
+    await this._setJSONCacheValue(cacheKey, { _v: 2, fetchedAt: new Date().toISOString(), payload: results }, ttl);
+    return results.map((result) => ({ ...result, confidence: this._matchConfidence(q, result) }));
+  }
+
+  /**
+   * How well a result's title matches the query, 0 to 1: 1 when the query is the title or one of its alternate
+   * titles (ignoring case, accents and punctuation), 0.85 when one contains the other, else the share of words
+   * they have in common. The best of the title and the alternates; never 1 unless the titles are the same.
+   * @param {string} query
+   * @param {{ title?: string, altTitles?: string[] }} result
+   * @returns {number}
+   * @private
+   */
+  _matchConfidence(query, result) {
+    /** @param {unknown} text */
+    const words = (text) => (typeof text === 'string'
+      ? text.normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean)
+      : []);
+    const queryWords = words(query);
+    if (queryWords.length === 0) return 0;
+    const queryKey = queryWords.join(' ');
+    const querySet = new Set(queryWords);
+
+    let best = 0;
+    for (const candidate of [result.title, ...(Array.isArray(result.altTitles) ? result.altTitles : [])]) {
+      const candidateWords = words(candidate);
+      if (candidateWords.length === 0) continue;
+      const candidateKey = candidateWords.join(' ');
+      let similarity;
+      if (candidateKey === queryKey) {
+        similarity = 1;
+      } else if (candidateKey.includes(queryKey) || queryKey.includes(candidateKey)) {
+        similarity = 0.85;
+      } else {
+        const candidateSet = new Set(candidateWords);
+        const shared = [...querySet].filter((word) => candidateSet.has(word)).length;
+        const union = new Set([...querySet, ...candidateSet]).size;
+        similarity = Math.min(0.99, union > 0 ? shared / union : 0);
+      }
+      if (similarity > best) best = similarity;
+    }
+    return Math.round(best * 100) / 100;
   }
 
   /**

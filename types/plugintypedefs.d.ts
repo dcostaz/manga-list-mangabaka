@@ -105,6 +105,12 @@ export interface PluginSearchResult {
   authors?: string[];
   seriesStatus?: string;
   score?: number;
+  /** How well the title matches the query, 0 to 1 (host-capability-contract §2). */
+  confidence?: number;
+  /** Set when the plugin answered from a cache of its own (host-capability-contract §2.4). Absent = live. */
+  cached?: true;
+  /** The ISO time a cached answer was fetched from the source; only with `cached`. */
+  fetchedAt?: string;
 }
 
 // ---------------------------------------------------------------------------

@@ -8,6 +8,7 @@ const SettingsClass = require(path.join(__dirname, 'api-settings-mangabaka.cjs')
 
 /** @type {PluginModuleDescriptor} */
 const pluginModule = {
+  displayName: 'MangaBaka',
   WrapperClass,
   SettingsClass,
 };

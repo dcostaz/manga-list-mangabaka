@@ -1,27 +1,65 @@
 {
   "pluginName": "mangabaka",
+  "displayName": "MangaBaka",
   "pluginType": "tracker",
-  "pluginContractVersion": "3.0.0",
+  "pluginContractVersion": "4.0.0",
   "hostApiVersion": "1.0.0",
   "iconPath": "images/mangabaka-icon.svg",
-  "capabilities": ["credential", "search.query", "search.lookup", "enrich", "enrich.cover", "sync.pull", "sync.push", "sync.list", "subscribe.add", "subscribe.remove", "watch.entry", "watch.list", "watch.summary"],
+  "capabilities": [
+    "credential",
+    "search.query",
+    "search.lookup",
+    "enrich",
+    "enrich.cover",
+    "sync.pull",
+    "sync.push",
+    "sync.list",
+    "subscribe.add",
+    "subscribe.remove",
+    "watch.entry",
+    "watch.list",
+    "watch.summary"
+  ],
   "entrypoints": {
-    "pluginModule": "apiwrappers/reg-mangabaka/plugin-module.cjs",
+    "pluginModule": "apiwrappers/reg-mangabaka/plugin-mangabaka.cjs",
     "settingsFile": "apiwrappers/reg-mangabaka/mangabaka-api-settings.json"
   },
   "syncOptions": {
-    "searchRequiresAuth": false,
     "statusVocabulary": {
-      "READING":      "reading",
-      "COMPLETED":    "completed",
-      "PLAN_TO_READ": "plan_to_read",
-      "ON_HOLD":      "paused",
-      "DROPPED":      "dropped",
-      "RE_READING":   "rereading"
+      "push": {
+        "READING": "reading",
+        "COMPLETED": "completed",
+        "PLAN_TO_READ": "plan_to_read",
+        "ON_HOLD": "paused",
+        "DROPPED": "dropped",
+        "RE_READING": "rereading"
+      },
+      "pull": {
+        "reading": "READING",
+        "completed": "COMPLETED",
+        "plan_to_read": "PLAN_TO_READ",
+        "considering": "PLAN_TO_READ",
+        "paused": "ON_HOLD",
+        "dropped": "DROPPED",
+        "rereading": "RE_READING"
+      }
     },
     "progressAxes": {
-      "pull": ["chapter", "rating"],
-      "push": ["chapter", "rating"]
+      "pull": ["chapter", { "axis": "rating", "scale": "decimal" }],
+      "push": ["chapter", { "axis": "rating", "scale": "decimal" }]
     }
+  },
+  "searchOptions": { "requiresCredential": false },
+  "credentialOptions": {
+    "fields": [
+      {
+        "key": "api_key",
+        "label": "Personal Access Token",
+        "type": "password",
+        "required": true,
+        "placeholder": "mb-…",
+        "description": "Generated on your MangaBaka account settings page; sent as the x-api-key header."
+      }
+    ]
   }
 }

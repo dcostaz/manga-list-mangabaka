@@ -55,15 +55,6 @@
     "api.endpoints.myLibraryEntry.throttle": 400,
     "ui.label": "MangaBaka",
     "ui.icon": "images/mangabaka-icon.svg",
-    "ui.credentialsTemplate": [
-      {
-        "key": "api_key",
-        "label": "Personal Access Token",
-        "type": "password",
-        "required": true,
-        "description": "Personal Access Token generated from your MangaBaka account/profile settings page. Sent as an x-api-key header."
-      }
-    ],
     "connection.timeout.connect": 5000,
     "connection.timeout.request": 30000,
     "connection.timeout.search": 30000,
@@ -76,12 +67,8 @@
     "retry.backoff.initialDelay": 1000,
     "retry.backoff.maxDelay": 10000,
     "retry.backoff.multiplier": 2,
-    "retry.retryableErrors": ["ETIMEDOUT", "ECONNRESET", "ECONNREFUSED", 502, 503, 504, 429],
-    "cache.enabled": true,
-    "cache.provider": "memory",
     "cache.ttl.seriesMetadata": 86400,
     "cache.ttl.searchResults": 3600,
-    "cache.ttl.library": 1800,
     "cache.ttl.coverUrls": 604800,
     "cache.ttl.default": 3600,
     "rateLimit.global.enabled": true,

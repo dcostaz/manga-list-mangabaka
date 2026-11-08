@@ -40,7 +40,9 @@
       "required": true,
       "default": "https://api.mangabaka.org/v1",
       "description": "Base URL for the MangaBaka public data API",
-      "validation": { "pattern": "^https://" },
+      "validation": {
+        "pattern": "^https://"
+      },
       "readOnly": true,
       "isBasic": false,
       "category": "network",
@@ -61,7 +63,10 @@
       "required": false,
       "default": 400,
       "description": "Minimum delay between profile-check requests (milliseconds)",
-      "validation": { "min": 0, "max": 60000 },
+      "validation": {
+        "min": 0,
+        "max": 60000
+      },
       "readOnly": true,
       "isBasic": false,
       "category": "performance",
@@ -167,24 +172,6 @@
       "category": "general",
       "order": 20
     },
-    "ui.credentialsTemplate": {
-      "type": "array",
-      "required": true,
-      "default": [
-        {
-          "key": "api_key",
-          "label": "Personal Access Token",
-          "type": "password",
-          "required": true,
-          "description": "Personal Access Token generated from your MangaBaka account/profile settings page. Sent as an x-api-key header — MangaBaka's OAuth2 client_credentials grant cannot access personal library data (confirmed live: it rejects with 401 \"Missing required scope\", since client_credentials represents the app itself, not a specific user)."
-        }
-      ],
-      "description": "Credential template definition for tracker auth prompts",
-      "readOnly": true,
-      "isBasic": false,
-      "category": "general",
-      "order": 30
-    },
     "credentials.primary": {
       "type": "credential",
       "required": false,
@@ -197,12 +184,18 @@
       "implementationStatus": "implemented",
       "category": "general",
       "order": 40,
-      "tags": ["credentials", "tracker", "security"],
+      "tags": [
+        "credentials",
+        "tracker",
+        "security"
+      ],
       "uiHints": {
         "widget": "credential",
         "serviceName": "mangabaka",
         "credentialType": "tracker",
-        "credentialKeys": ["api_key"]
+        "credentialKeys": [
+          "api_key"
+        ]
       }
     },
     "connection.timeout.connect": {
@@ -210,7 +203,10 @@
       "required": true,
       "default": 5000,
       "description": "TCP connection timeout in milliseconds",
-      "validation": { "min": 1000, "max": 30000 },
+      "validation": {
+        "min": 1000,
+        "max": 30000
+      },
       "readOnly": false,
       "isBasic": false,
       "category": "network",
@@ -221,7 +217,10 @@
       "required": true,
       "default": 30000,
       "description": "Total request timeout in milliseconds",
-      "validation": { "min": 5000, "max": 300000 },
+      "validation": {
+        "min": 5000,
+        "max": 300000
+      },
       "readOnly": false,
       "isBasic": false,
       "category": "network",
@@ -232,7 +231,10 @@
       "required": true,
       "default": 30000,
       "description": "Search request timeout in milliseconds",
-      "validation": { "min": 10000, "max": 300000 },
+      "validation": {
+        "min": 10000,
+        "max": 300000
+      },
       "readOnly": false,
       "isBasic": false,
       "category": "network",
@@ -243,7 +245,10 @@
       "required": true,
       "default": 10,
       "description": "Maximum concurrent connections to API",
-      "validation": { "min": 1, "max": 50 },
+      "validation": {
+        "min": 1,
+        "max": 50
+      },
       "readOnly": false,
       "isBasic": false,
       "category": "network",
@@ -254,7 +259,10 @@
       "required": true,
       "default": 5,
       "description": "Maximum idle connections in pool",
-      "validation": { "min": 0, "max": 25 },
+      "validation": {
+        "min": 0,
+        "max": 25
+      },
       "readOnly": false,
       "isBasic": false,
       "category": "network",
@@ -285,7 +293,10 @@
       "required": true,
       "default": 3,
       "description": "Maximum retry attempts before giving up",
-      "validation": { "min": 1, "max": 10 },
+      "validation": {
+        "min": 1,
+        "max": 10
+      },
       "readOnly": false,
       "isBasic": false,
       "category": "performance",
@@ -296,7 +307,13 @@
       "required": true,
       "default": "exponential",
       "description": "Backoff strategy: exponential, linear, or fixed",
-      "validation": { "enum": ["exponential", "linear", "fixed"] },
+      "validation": {
+        "enum": [
+          "exponential",
+          "linear",
+          "fixed"
+        ]
+      },
       "readOnly": false,
       "isBasic": false,
       "category": "performance",
@@ -307,7 +324,10 @@
       "required": true,
       "default": 1000,
       "description": "Initial delay before first retry in milliseconds",
-      "validation": { "min": 100, "max": 10000 },
+      "validation": {
+        "min": 100,
+        "max": 10000
+      },
       "readOnly": false,
       "isBasic": false,
       "category": "performance",
@@ -318,7 +338,10 @@
       "required": true,
       "default": 10000,
       "description": "Maximum delay between retries in milliseconds",
-      "validation": { "min": 1000, "max": 60000 },
+      "validation": {
+        "min": 1000,
+        "max": 60000
+      },
       "readOnly": false,
       "isBasic": false,
       "category": "performance",
@@ -329,49 +352,24 @@
       "required": true,
       "default": 2,
       "description": "Exponential backoff multiplier",
-      "validation": { "min": 1, "max": 10 },
+      "validation": {
+        "min": 1,
+        "max": 10
+      },
       "readOnly": false,
       "isBasic": false,
       "category": "performance",
       "order": 340
-    },
-    "retry.retryableErrors": {
-      "type": "array",
-      "required": true,
-      "default": ["ETIMEDOUT", "ECONNRESET", "ECONNREFUSED", 502, 503, 504, 429],
-      "description": "Retryable HTTP status codes and network error names",
-      "readOnly": false,
-      "isBasic": false,
-      "category": "performance",
-      "order": 360
-    },
-    "cache.enabled": {
-      "type": "boolean",
-      "required": true,
-      "default": true,
-      "description": "Enable host-provided caching",
-      "readOnly": false,
-      "isBasic": true,
-      "category": "performance",
-      "order": 10
-    },
-    "cache.provider": {
-      "type": "string",
-      "required": true,
-      "default": "memory",
-      "description": "Cache provider: system (inherit host), memory, file, redis, or none",
-      "validation": { "enum": ["system", "memory", "file", "redis", "none"] },
-      "readOnly": false,
-      "isBasic": false,
-      "category": "performance",
-      "order": 20
     },
     "cache.ttl.seriesMetadata": {
       "type": "number",
       "required": true,
       "default": 86400,
       "description": "TTL for series metadata in seconds (24h) - MangaBaka refreshes weekly per its own docs",
-      "validation": { "min": 60, "max": 2592000 },
+      "validation": {
+        "min": 60,
+        "max": 2592000
+      },
       "readOnly": true,
       "isBasic": false,
       "category": "performance",
@@ -382,29 +380,24 @@
       "required": true,
       "default": 3600,
       "description": "TTL for search results in seconds (1h)",
-      "validation": { "min": 60, "max": 86400 },
+      "validation": {
+        "min": 60,
+        "max": 86400
+      },
       "readOnly": true,
       "isBasic": false,
       "category": "performance",
       "order": 830
-    },
-    "cache.ttl.library": {
-      "type": "number",
-      "required": true,
-      "default": 1800,
-      "description": "TTL for the user's library contents in seconds (30m) - user modifies it directly",
-      "validation": { "min": 60, "max": 86400 },
-      "readOnly": true,
-      "isBasic": false,
-      "category": "performance",
-      "order": 840
     },
     "cache.ttl.coverUrls": {
       "type": "number",
       "required": true,
       "default": 604800,
       "description": "TTL for cover image URLs in seconds (7d)",
-      "validation": { "min": 3600, "max": 2592000 },
+      "validation": {
+        "min": 3600,
+        "max": 2592000
+      },
       "readOnly": true,
       "isBasic": false,
       "category": "performance",
@@ -415,7 +408,10 @@
       "required": true,
       "default": 3600,
       "description": "Default TTL for uncategorized data in seconds (1h)",
-      "validation": { "min": 60, "max": 86400 },
+      "validation": {
+        "min": 60,
+        "max": 86400
+      },
       "readOnly": false,
       "isBasic": false,
       "category": "performance",
@@ -436,7 +432,10 @@
       "required": true,
       "default": 5,
       "description": "Maximum concurrent requests allowed",
-      "validation": { "min": 1, "max": 50 },
+      "validation": {
+        "min": 1,
+        "max": 50
+      },
       "readOnly": false,
       "isBasic": false,
       "category": "performance",
@@ -447,7 +446,10 @@
       "required": true,
       "default": 170,
       "description": "Maximum requests per minute globally - MangaBaka's default (non-search) limit is 180/min, IP-based",
-      "validation": { "min": 10, "max": 1000 },
+      "validation": {
+        "min": 10,
+        "max": 1000
+      },
       "readOnly": false,
       "isBasic": false,
       "category": "performance",
@@ -468,7 +470,10 @@
       "required": true,
       "default": 400,
       "description": "Default delay between same-endpoint calls in milliseconds",
-      "validation": { "min": 0, "max": 60000 },
+      "validation": {
+        "min": 0,
+        "max": 60000
+      },
       "readOnly": false,
       "isBasic": false,
       "category": "performance",
@@ -489,7 +494,10 @@
       "required": true,
       "default": 5,
       "description": "Failures before opening circuit",
-      "validation": { "min": 1, "max": 20 },
+      "validation": {
+        "min": 1,
+        "max": 20
+      },
       "readOnly": false,
       "isBasic": false,
       "category": "performance",
@@ -500,7 +508,10 @@
       "required": true,
       "default": 10000,
       "description": "Time window for counting failures in milliseconds",
-      "validation": { "min": 1000, "max": 60000 },
+      "validation": {
+        "min": 1000,
+        "max": 60000
+      },
       "readOnly": false,
       "isBasic": false,
       "category": "performance",
@@ -511,7 +522,10 @@
       "required": true,
       "default": 30000,
       "description": "Duration circuit stays open in milliseconds",
-      "validation": { "min": 5000, "max": 300000 },
+      "validation": {
+        "min": 5000,
+        "max": 300000
+      },
       "readOnly": false,
       "isBasic": false,
       "category": "performance",

@@ -26,10 +26,9 @@ During development (unit tests, integration tests in this repo) only Tier 1 is a
 |-----|---------|-------|
 | `ui.label` | `MangaBaka` | Display name shown in the host UI |
 | `ui.icon` | `images/mangabaka-icon.svg` | Icon path relative to the runtime package |
-| `ui.credentialsTemplate` | See below | Credential form schema |
 | `credentials.primary` | `null` | Managed via host keychain; never stored in the settings file |
 
-### Credential fields
+### Credential fields (the manifest's `credentialOptions.fields`, contract §1.4)
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -51,8 +50,8 @@ which is new infrastructure this codebase doesn't have.
 This plugin instead uses MangaBaka's **Personal Access Token** (PAT) support: a static token, sent
 as a plain `x-api-key` header on every authenticated request. There is no token endpoint, no
 expiry, and no refresh flow — the credential itself is the usable value.
-`refreshCredentials()`/`testCredentials()` make a lightweight `GET /v1/my/profile` call to confirm
-the token still works; there is nothing to cache or renew.
+`testCredentials()` makes a lightweight `GET /v1/my/profile` call with the token under test; there is nothing to
+exchange, cache or renew, and no `refreshCredentials` (it left the contract with 4.0.0).
 
 ---
 
@@ -87,7 +86,14 @@ responses exempt. `rateLimit.global.maxPerMinute` defaults to 170 (a safety marg
 
 ## Status Vocabulary
 
-`plugin-package.json`'s `syncOptions.statusVocabulary` is currently **all `null`** — MangaBaka's
-native library status strings (the values `library.read`/`library.write` actually use, e.g.
-`reading`/`completed`/etc.) were not verified live. All-`null` means the host skips every
-`subscribe()` call until this is filled in. Correct it via `npm run test:library:interactive`.
+The manifest's `syncOptions.statusVocabulary` has two tables (contract §2.2). `push` maps every host status to
+MangaBaka's state: READING → `reading`, COMPLETED → `completed`, PLAN_TO_READ → `plan_to_read`, ON_HOLD → `paused`,
+DROPPED → `dropped`, RE_READING → `rereading`. `pull` maps every state MangaBaka returns back, `considering` to
+PLAN_TO_READ as well. The plugin sends and returns MangaBaka's own tokens; the host resolves them.
+
+## Removed keys (Plan-2026Q4-tracker-plugin-standardization, Decision 5)
+
+`cache.enabled`, `cache.provider` (the cache is the host's), `retry.retryableErrors` (the SDK's standard set),
+`ui.credentialsTemplate` (the manifest's credential fields replace it) and `cache.ttl.library` (the library is no
+longer cached: it is read whole, page by page, when asked). The `connection.*`, `retry.*`, `rateLimit.*` and
+`resilience.circuitBreaker.*` keys are now enforced by the SDK's HTTP layer.

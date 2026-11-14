@@ -110,6 +110,20 @@ function contribution(raw) {
 /** MangaBaka's 0–100 library rating → the host's 0–10. @param {unknown} rating */
 const ratingOf = (rating) => (typeof rating === 'number' ? Math.round(rating) / 10 : null);
 
+/** The series fields that carry alternate titles. */
+const ALT_TITLE_FIELDS = Object.freeze(['native_title', 'romanized_title', 'titles', 'secondary_titles']);
+
+/**
+ * A library row's alternate titles (A30), from the series it embeds: `null` where the row embeds none, or one that
+ * carries none of the alternate-title fields; never a series read.
+ * @param {any} series
+ * @returns {string[] | null}
+ */
+function listRowAltTitles(series) {
+    if (!series || !ALT_TITLE_FIELDS.some((field) => series[field] !== undefined && series[field] !== null)) return null;
+    return altTitles(series);
+}
+
 /** @param {any} row */
 function readingListEntry(row) {
     const series = row && row.Series && typeof row.Series === 'object' ? row.Series : null;
@@ -117,6 +131,7 @@ function readingListEntry(row) {
     return {
         pluginEntryId: id,
         title: series && typeof series.title === 'string' ? series.title : null,
+        altTitles: listRowAltTitles(series),
         canonicalUrl: (series && canonicalUrl(series)) || `${SITE}/${id}`,
         status: typeof row.state === 'string' ? row.state : null,
         chapter: typeof row.progress_chapter === 'number' ? row.progress_chapter : null,

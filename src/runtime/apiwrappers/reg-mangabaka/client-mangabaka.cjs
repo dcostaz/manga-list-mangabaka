@@ -121,7 +121,8 @@ function createClient({ settings, utils, addNormalizer }) {
             if (cached) return cached;
             const body = (await http.get(endpoint(settings, 'seriesDetail', { series_id: id }), { endpoint: 'seriesDetail' })).data;
             const data = body && typeof body === 'object' ? body.data : null;
-            if (!data) throw new PluginError('not_found', `MangaBaka has no series ${id}`);
+            // A series MangaBaka does not have is its 404 (not_found); an answer with no series is unreadable (A25).
+            if (!data || typeof data !== 'object') throw new PluginError('source_error', `MangaBaka answered no series record for ${id}`);
             await cache.set(key, data, ttl('seriesMetadata', 86400));
             return data;
         }
@@ -136,17 +137,25 @@ function createClient({ settings, utils, addNormalizer }) {
                 if (hit && Array.isArray(hit.rows) && hit.rows.length) return { query: q, rows: hit.rows, fetchedAt: hit.fetchedAt || null, cached: true };
             }
             const body = (await http.get(endpoint(settings, 'seriesSearch'), { params: { q }, endpoint: 'seriesSearch', timeoutKind: 'search' })).data;
-            const rows = body && Array.isArray(body.data) ? body.data : [];
+            // An answer with no result list is unreadable, never "no candidates" (A25).
+            if (!body || !Array.isArray(body.data)) throw new PluginError('source_error', `MangaBaka answered no search results for '${q}'`);
+            const rows = body.data;
             const fetchedAt = new Date().toISOString();
             await cache.set(key, { rows, fetchedAt }, ttl('searchResults', 3600));
             return { query: q, rows, fetchedAt, cached: false };
         }
 
-        /** @param {string | number} id @returns {Promise<any | null>} the library entry, or null when not on the library */
+        /**
+         * The library entry, or null when not on the library (404). An answer with no entry is unreadable, never "not
+         * on the library" (A25).
+         * @param {string | number} id
+         * @returns {Promise<any | null>}
+         */
         async function libraryEntry(id) {
             try {
                 const body = (await authed({ method: 'get', url: endpoint(settings, 'myLibraryEntry', { series_id: id }), endpoint: 'myLibraryEntry' })).data;
-                return body && typeof body === 'object' && body.data ? body.data : null;
+                if (body && typeof body === 'object' && body.data && typeof body.data === 'object') return body.data;
+                throw new PluginError('source_error', `MangaBaka answered no library entry for series ${id}`);
             } catch (error) {
                 if (isNotFound(error)) return null;
                 throw error;
@@ -197,14 +206,15 @@ function createClient({ settings, utils, addNormalizer }) {
                 await authed({ method: 'patch', url: endpoint(settings, 'myLibraryEntry', { series_id: entry.pluginEntryId }), data: body, endpoint: 'myLibraryEntry' });
                 return body;
             },
-            /** The whole library, every page (F17). */
+            /** The whole library, every page (F17); a page with no entries list is unreadable, never a short library (A25). */
             async getReadingList() {
                 /** @type {any[]} */
                 const rows = [];
                 for (let page = 1; page; ) {
                     const body = (await authed({ method: 'get', url: endpoint(settings, 'myLibrary'), params: { page, limit: LIBRARY_PAGE_LIMIT }, endpoint: 'myLibrary' })).data;
-                    if (body && Array.isArray(body.data)) rows.push(...body.data);
-                    const pagination = body && body.pagination;
+                    if (!body || !Array.isArray(body.data)) throw new PluginError('source_error', `MangaBaka answered no library entries for page ${page}`);
+                    rows.push(...body.data);
+                    const pagination = body.pagination;
                     page = pagination && pagination.next ? page + 1 : 0;
                 }
                 return rows;
@@ -220,7 +230,11 @@ function createClient({ settings, utils, addNormalizer }) {
                 }
                 return { state: entry.status };
             },
-            /** Already absent is success (§2). @param {string} id */
+            /**
+             * `DELETE` takes the series off the library, the one list the account has and the list read's whole
+             * source (live-confirmed 2026-08-27: gone from the list afterwards): on none of the user's lists (A29).
+             * Already absent is success (§2). @param {string} id
+             */
             async unsubscribe(id) {
                 try {
                     await authed({ method: 'delete', url: endpoint(settings, 'myLibraryEntry', { series_id: id }), endpoint: 'myLibraryEntry' });

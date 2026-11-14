@@ -5,8 +5,9 @@
 [![download-runtime-zip](https://img.shields.io/badge/download-runtime_zip-0969da?logo=github)](https://github.com/dcostaz/manga-list-mangabaka/releases/download/runtime-latest/manga-list-mangabaka-runtime.zip)
 
 The manga-list tracker plugin for [MangaBaka](https://mangabaka.org), a manga metadata aggregator with a personal
-library API. Contract **4.0.0** (`docs/plugins/host-capability-contract.md` in the host repo), built on
-`@manga-list/plugin-sdk` in the template's shape (`Plan-2026Q4-tracker-plugin-standardization.md`, Phase 4).
+library API. Contract **4.2.0** (`docs/plugins/host-capability-contract.md` in the host repo), built on
+`@manga-list/plugin-sdk` in the template's shape (`Plan-2026Q4-tracker-plugin-standardization.md`, Phase 4; the sync
+refactor's amendments A27–A30, `Plan-2026Q4-sync-refactor.md`).
 
 Settings reference: [docs/settings.md](docs/settings.md). What happened to each 3.x method:
 [docs/nothing-lost.md](docs/nothing-lost.md).
@@ -33,13 +34,24 @@ in the 3.x tests (2026-08-24/27):
   `client_credentials` was tried and refused for personal scopes; `authorization_code` would need a browser login the
   host does not have.)
 - **The library** (`GET /v1/my/library`) is paged: `page` from 1, `limit` up to 100 (default 12), and a `pagination`
-  object whose `next` is null on the last page. The client reads every page; the 3.x wrapper read one (F17).
+  object whose `next` is null on the last page. The client reads every page; the 3.x wrapper read one (F17). Each
+  entry embeds its series (`Series`): the list read's `title` and its `altTitles` (native, romanized, `titles[]`,
+  `secondary_titles`, the primary left out) come from it, with no series read; `altTitles` is `null` where an entry
+  embeds no series or one with none of those fields (A30).
+- **The system list is the system account's library, not the catalogue**: the manifest declares
+  `watchOptions.wholeHolding: false` (A28), so a series missing from the `watch.list` read is not taken as missing from
+  MangaBaka.
 - **Library states** are `considering`, `completed`, `dropped`, `paused`, `plan_to_read`, `reading`, `rereading` — all
   seven in the manifest's `pull` table; `considering` is pull-only (the host writes `plan_to_read`). `paused` was
   confirmed live (2026-08-27); the other six are the API document's enum.
 - **Writes**: `PATCH /v1/my/library/{series_id}` sets a state or progress; a series never added answers 404 and is
   created with `POST` on the same path (live-confirmed 2026-08-26/27); `DELETE` removes, and a 404 there is success.
   The library rating is 0–100; the host's is 0–10.
+- **A removal** (`unsubscribe`, A29) is that `DELETE`: the library is the account's one list and the whole of what the
+  list read returns, so a removed series is on none of the user's lists (live-confirmed 2026-08-27: gone from the list
+  afterwards). The list read is never cached.
+- **An unreadable answer** (a library page, a library entry, a series or a search answer with no `data`) is
+  `source_error`, never an empty or short list, "not on the library" or `not_found` (A25).
 
 ## Build and test
 
@@ -61,4 +73,4 @@ ENABLE_REAL_LIBRARY_TEST=1 MB_TEST_API_KEY=mb-... npm run test:integration
 ```
 
 `@manga-list/plugin-sdk` is a devDependency pinned to the contract's tag
-(`git+https://github.com/dcostaz/manga-list-plugin-sdk.git#v4.0.0`).
+(`git+https://github.com/dcostaz/manga-list-plugin-sdk.git#v4.2.0`).

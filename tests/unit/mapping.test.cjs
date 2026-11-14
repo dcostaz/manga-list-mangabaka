@@ -64,6 +64,17 @@ test('getReadingList: MangaBaka\'s own state token passes through — considerin
     assert.equal(out[2].title, 'Three');
 });
 
+test('getReadingList: altTitles (A30) from the embedded series, the primary left out; null where the row embeds none or carries no such field', () => {
+    const out = mapping.getReadingList([
+        { series_id: 1, state: 'reading', Series: series(1) },
+        { series_id: 2, state: 'reading' },
+        { series_id: 3, state: 'reading', Series: { id: 3, title: 'Three' } },
+        { series_id: 4, state: 'reading', Series: { id: 4, title: 'Four', native_title: 'Four', secondary_titles: {} } },
+    ]);
+    assert.deepEqual(validateResult('getReadingList', out, { manifest: tracker.manifest }), []);
+    assert.deepEqual(out.map((/** @type {any} */ e) => e.altTitles), [['シリーズ 1', 'Shiriizu 1', 'The Series 1'], null, null, []]);
+});
+
 test('pullProgress: the entry\'s token and progress; no entry is all-null', () => {
     assert.deepEqual(mapping.pullProgress({ state: 'paused', progress_chapter: 4, rating: 70 }, '9'), { pluginEntryId: '9', status: 'paused', chapter: 4, rating: 7, lastUpdated: null });
     assert.deepEqual(mapping.pullProgress(null, '9'), { pluginEntryId: '9', status: null, chapter: null, rating: null, lastUpdated: null });

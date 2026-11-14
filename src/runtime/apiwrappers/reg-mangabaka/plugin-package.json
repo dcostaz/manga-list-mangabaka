@@ -2,7 +2,7 @@
   "pluginName": "mangabaka",
   "displayName": "MangaBaka",
   "pluginType": "tracker",
-  "pluginContractVersion": "4.0.0",
+  "pluginContractVersion": "4.2.0",
   "hostApiVersion": "1.0.0",
   "iconPath": "images/mangabaka-icon.svg",
   "capabilities": [
@@ -49,6 +49,7 @@
       "push": ["chapter", { "axis": "rating", "scale": "decimal" }]
     }
   },
+  "watchOptions": { "wholeHolding": false },
   "searchOptions": { "requiresCredential": false },
   "credentialOptions": {
     "fields": [

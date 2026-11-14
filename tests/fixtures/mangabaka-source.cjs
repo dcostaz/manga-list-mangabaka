@@ -33,10 +33,11 @@ function series(id) {
     };
 }
 
+/** The library: each entry embeds its series (`Series`), the source of the list read's title and alternate titles. */
 const LIBRARY = [
-    { series_id: 1, state: 'reading', rating: 85, progress_chapter: 12, progress_volume: 2, priority: 20 },
-    { series_id: 2, state: 'considering', rating: null, progress_chapter: null, progress_volume: null, priority: 20 },
-    { series_id: 3, state: 'paused', rating: 70, progress_chapter: 3, progress_volume: null, priority: 10 },
+    { series_id: 1, state: 'reading', rating: 85, progress_chapter: 12, progress_volume: 2, priority: 20, Series: series(1) },
+    { series_id: 2, state: 'considering', rating: null, progress_chapter: null, progress_volume: null, priority: 20, Series: series(2) },
+    { series_id: 3, state: 'paused', rating: 70, progress_chapter: 3, progress_volume: null, priority: 10, Series: series(3) },
 ];
 
 /**

@@ -90,6 +90,47 @@ test('unsubscribe: an entry already absent (404) is success', async () => {
     assert.deepEqual(await instance.unsubscribe(['5'], user()), [{ pluginEntryId: '5', success: true }]);
 });
 
+test('unsubscribe (A29): the DELETE takes the series off the library, so the list read no longer returns it', async () => {
+    /** @type {Set<number>} */
+    const removed = new Set();
+    const { instance, axios } = await plugin((config) => {
+        const id = Number(String(config.url).split('/').pop());
+        if (config.method === 'delete') {
+            if (removed.has(id)) return { status: 404, data: { status: 404 } };
+            removed.add(id);
+            return { status: 200, data: { status: 200, data: true } };
+        }
+        const out = sourceHandler(config);
+        if (config.url === `${BASE}/my/library` && out.data && Array.isArray(out.data.data)) {
+            out.data = { ...out.data, data: out.data.data.filter((/** @type {any} */ e) => !removed.has(e.series_id)) };
+        }
+        return out;
+    });
+    assert.deepEqual(await instance.unsubscribe(['3', '3'], user()), [{ pluginEntryId: '3', success: true }, { pluginEntryId: '3', success: true }]);
+    assert.deepEqual(axios.calls.filter((c) => c.method === 'delete').map((c) => c.url), [`${BASE}/my/library/3`, `${BASE}/my/library/3`]);
+    assert.deepEqual((await instance.getReadingList(user())).map((/** @type {any} */ e) => e.pluginEntryId), ['1', '2']);
+});
+
+test('getReadingList: every entry carries altTitles from the series it embeds (A30), with no series read', async () => {
+    const { instance, axios } = await plugin();
+    const list = await instance.getReadingList(user());
+    assert.deepEqual(list[0].altTitles, ['シリーズ 1', 'Shiriizu 1', 'The Series 1']);
+    assert.equal(axios.calls.some((c) => /\/series\/\d+$/.test(String(c.url))), false);
+});
+
+test('A25: an unreadable library page, library entry, series or search answer is source_error, never an empty or absent answer', async () => {
+    const { instance } = await plugin((config) => {
+        const url = String(config.url);
+        if (url === `${BASE}/my/library` && config.params && config.params.page === 2) return { status: 200, data: { status: 200 } };
+        if (url === `${BASE}/my/library/2` || url === `${BASE}/series/2` || url === `${BASE}/series/search`) return { status: 200, data: { status: 200 } };
+        return sourceHandler(config);
+    });
+    await assert.rejects(instance.getReadingList(user()), (e) => isPluginError(e) && e.code === 'source_error');
+    await assert.rejects(instance.pullProgress('2', user()), (e) => isPluginError(e) && e.code === 'source_error');
+    await assert.rejects(instance.lookup('2', user()), (e) => isPluginError(e) && e.code === 'source_error');
+    await assert.rejects(instance.search('Series 1', undefined, user()), (e) => isPluginError(e) && e.code === 'source_error');
+});
+
 test('search: a repeat is answered from the cache with its fetch time; refresh asks MangaBaka again', async () => {
     const { instance, axios } = await plugin();
     const system = callContext({ credential: null, identity: 'system-slot', scope: 'system' });

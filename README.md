@@ -73,4 +73,4 @@ ENABLE_REAL_LIBRARY_TEST=1 MB_TEST_API_KEY=mb-... npm run test:integration
 ```
 
 `@manga-list/plugin-sdk` is a devDependency pinned to the contract's tag
-(`git+https://github.com/dcostaz/manga-list-plugin-sdk.git#v4.2.1`).
+(`git+https://github.com/dcostaz/manga-list-plugin-sdk.git#v4.3.0`).

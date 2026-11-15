@@ -131,6 +131,21 @@ test('A25: an unreadable library page, library entry, series or search answer is
     await assert.rejects(instance.search('Series 1', undefined, user()), (e) => isPluginError(e) && e.code === 'source_error');
 });
 
+test('enrich (4.3.0, A31): a repeat is answered from the cache with its fetch time; refresh asks MangaBaka again', async () => {
+    const { instance, axios } = await plugin();
+    const system = callContext({ credential: null, identity: 'system-slot', scope: 'system' });
+    const reads = () => axios.calls.filter((c) => c.url === `${BASE}/series/2`).length;
+    const live = await instance.enrich(['2'], system);
+    assert.deepEqual([live[0].contribution.cached, live[0].contribution.fetchedAt], [undefined, undefined], 'a live answer says nothing');
+    const cached = await instance.enrich(['2'], system);
+    assert.equal(cached[0].contribution.cached, true);
+    assert.match(String(cached[0].contribution.fetchedAt), /^\d{4}-\d{2}-\d{2}T/);
+    assert.equal(reads(), 1);
+    const refreshed = await instance.enrich(['2'], { refresh: true }, system);
+    assert.equal(refreshed[0].contribution.cached, undefined);
+    assert.equal(reads(), 2);
+});
+
 test('search: a repeat is answered from the cache with its fetch time; refresh asks MangaBaka again', async () => {
     const { instance, axios } = await plugin();
     const system = callContext({ credential: null, identity: 'system-slot', scope: 'system' });

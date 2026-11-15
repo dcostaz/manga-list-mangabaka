@@ -5,7 +5,7 @@
 [![download-runtime-zip](https://img.shields.io/badge/download-runtime_zip-0969da?logo=github)](https://github.com/dcostaz/manga-list-mangabaka/releases/download/runtime-latest/manga-list-mangabaka-runtime.zip)
 
 The manga-list tracker plugin for [MangaBaka](https://mangabaka.org), a manga metadata aggregator with a personal
-library API. Contract **4.2.1** (`docs/plugins/host-capability-contract.md` in the host repo), built on
+library API. Contract **4.3.0** (`docs/plugins/host-capability-contract.md` in the host repo), built on
 `@manga-list/plugin-sdk` in the template's shape (`Plan-2026Q4-tracker-plugin-standardization.md`, Phase 4; the sync
 refactor's amendments A27–A30, `Plan-2026Q4-sync-refactor.md`).
 

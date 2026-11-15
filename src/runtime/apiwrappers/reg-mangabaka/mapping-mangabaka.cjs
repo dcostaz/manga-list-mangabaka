@@ -161,7 +161,15 @@ module.exports = {
     /** @param {any} raw */
     lookup: (raw) => ({ ...contribution(raw), canonicalUrl: canonicalUrl(raw) }),
     /** @param {any} raw */
-    enrich: (raw) => ({ contribution: contribution(raw) }),
+    /**
+     * A31: a contribution answered from the cache says so, and when it was fetched.
+     * @param {{ value: any, cached: boolean, fetchedAt: string | null }} read
+     */
+    enrich: (read) => {
+        const out = contribution(read.value);
+        if (!read.cached) return { contribution: out };
+        return { contribution: read.fetchedAt ? { ...out, cached: true, fetchedAt: read.fetchedAt } : { ...out, cached: true } };
+    },
     /** One cover per series: MangaBaka's current one. @param {any} raw */
     searchCovers(raw) {
         const url = coverUrl(raw);

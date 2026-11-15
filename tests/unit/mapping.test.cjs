@@ -48,7 +48,12 @@ test('lookup and enrich: the contribution, its status mapped, its source link', 
     assert.deepEqual(validateResult('lookup', detail), []);
     assert.equal(detail.seriesStatus, 'ongoing', 'MangaBaka "releasing" is ongoing');
     assert.deepEqual(detail.sourceLinks, [{ siteId: 'mangabaka', siteLabel: 'MangaBaka', seriesUrl: 'https://mangabaka.org/2', isPrimary: true }]);
-    assert.equal(mapping.enrich(series(2)).contribution.pluginEntryId, '2');
+    assert.equal(mapping.enrich({ value: series(2), cached: false, fetchedAt: null }).contribution.pluginEntryId, '2');
+    // A31: a cached read says so, and when it was fetched; one cached before the time was kept says it was cached alone.
+    const cached = mapping.enrich({ value: series(2), cached: true, fetchedAt: '2026-11-15T00:00:00.000Z' }).contribution;
+    assert.deepEqual([cached.cached, cached.fetchedAt], [true, '2026-11-15T00:00:00.000Z']);
+    const old = mapping.enrich({ value: series(2), cached: true, fetchedAt: null }).contribution;
+    assert.deepEqual([old.cached, 'fetchedAt' in old], [true, false]);
 });
 
 test('getReadingList: MangaBaka\'s own state token passes through — considering, paused, rereading included (A6)', () => {

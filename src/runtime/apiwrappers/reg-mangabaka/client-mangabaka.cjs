@@ -114,17 +114,25 @@ function createClient({ settings, utils, addNormalizer }) {
         /** @param {Record<string, any>} config */
         const authed = (config) => http.authedRequest(config);
 
-        /** The series, from the cache when fresh. @param {string | number} id @returns {Promise<any>} */
+        /**
+         * The series, read through the cache (contract 4.3.0, A31): from the cache when fresh unless `fresh`, with
+         * whether it came from there and when it was fetched.
+         * @param {string | number} id @param {{ fresh?: boolean }} [options]
+         * @returns {Promise<{ value: any, cached: boolean, fetchedAt: string | null }>}
+         */
+        function seriesRead(id, options = {}) {
+            return cache.readThrough(`series:${id}`, { fresh: options.fresh === true, ttlSeconds: ttl('seriesMetadata', 86400) }, async () => {
+                const body = (await http.get(endpoint(settings, 'seriesDetail', { series_id: id }), { endpoint: 'seriesDetail' })).data;
+                const data = body && typeof body === 'object' ? body.data : null;
+                // A series MangaBaka does not have is its 404 (not_found); an answer with no series is unreadable (A25).
+                if (!data || typeof data !== 'object') throw new PluginError('source_error', `MangaBaka answered no series record for ${id}`);
+                return data;
+            });
+        }
+
+        /** The series alone. @param {string | number} id @returns {Promise<any>} */
         async function series(id) {
-            const key = `series:${id}`;
-            const cached = await cache.get(key);
-            if (cached) return cached;
-            const body = (await http.get(endpoint(settings, 'seriesDetail', { series_id: id }), { endpoint: 'seriesDetail' })).data;
-            const data = body && typeof body === 'object' ? body.data : null;
-            // A series MangaBaka does not have is its 404 (not_found); an answer with no series is unreadable (A25).
-            if (!data || typeof data !== 'object') throw new PluginError('source_error', `MangaBaka answered no series record for ${id}`);
-            await cache.set(key, data, ttl('seriesMetadata', 86400));
-            return data;
+            return (await seriesRead(id)).value;
         }
 
         /** @param {string} query @param {{ refresh?: boolean }} [options] */
@@ -172,7 +180,8 @@ function createClient({ settings, utils, addNormalizer }) {
             /** @param {string} id */
             lookup: (id) => series(id),
             /** @param {string} id */
-            enrich: (id) => series(id),
+            /** A31: the source's own answer when the user asked for it. @param {string} id @param {{ refresh?: boolean }} [options] */
+            enrich: (id, options) => seriesRead(id, { fresh: !!(options && options.refresh === true) }),
             /** @param {{ title?: string }} query @param {{ pluginEntryId?: string }} [options] */
             async searchCovers(query, options = {}) {
                 if (options && options.pluginEntryId) return series(options.pluginEntryId);

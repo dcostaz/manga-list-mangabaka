@@ -2,7 +2,7 @@
   "pluginName": "mangabaka",
   "displayName": "MangaBaka",
   "pluginType": "tracker",
-  "pluginContractVersion": "4.2.0",
+  "pluginContractVersion": "4.2.1",
   "hostApiVersion": "1.0.0",
   "iconPath": "images/mangabaka-icon.svg",
   "capabilities": [

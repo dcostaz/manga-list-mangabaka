@@ -14,9 +14,13 @@
  *    object whose `next` is null on the last page (F17: the old wrapper read one page, 12 entries at most).
  *  - a library entry's `state` is one of considering, completed, dropped, paused, plan_to_read, reading, rereading;
  *    its `rating` is 0–100.
+ *  - `GET /v1/series/search` takes `limit` as the library does: the live reads of 2026-11-19 (sub-plan 7.6's
+ *    captures) sent `limit=3` and the answer's `pagination` echoed `limit: 3`, its `next` carrying it, with `count`
+ *    the whole number of hits. Its maximum is not verified (the library's is 100); the result cap asks 25 at most (A36).
+ *    Without `limit` the source answers its own default page, as it always has.
  */
 
-const { PluginError, isPluginError } = require('@manga-list/plugin-sdk');
+const { PluginError, isPluginError, resultCapOf } = require('@manga-list/plugin-sdk');
 
 /** The API's own maximum page size for the library. */
 const LIBRARY_PAGE_LIMIT = 100;
@@ -135,16 +139,23 @@ function createClient({ settings, utils, addNormalizer }) {
             return (await seriesRead(id)).value;
         }
 
-        /** @param {string} query @param {{ refresh?: boolean }} [options] */
+        /**
+         * `allHits` (A35, Tracker Search only) asks MangaBaka for up to the result cap's hits (A36, `limit`); without it,
+         * the source's own default page, exactly as before (*Link a source*, Decision 6). The cache is keyed on the
+         * limit, so one answer is never reused as the other.
+         * @param {string} query @param {import('@manga-list/plugin-sdk').PluginSearchOptions} [options]
+         */
         async function search(query, options = {}) {
             const q = typeof query === 'string' ? query.trim() : '';
             if (!q) return { query: q, rows: [], fetchedAt: null, cached: false };
-            const key = `search:${sanitize(q)}`;
+            const limit = options.allHits === true ? resultCapOf(settings) : null;
+            const key = limit === null ? `search:${sanitize(q)}` : `search-all:${limit}:${sanitize(q)}`;
             if (!options.refresh) {
                 const hit = /** @type {any} */ (await cache.get(key));
                 if (hit && Array.isArray(hit.rows) && hit.rows.length) return { query: q, rows: hit.rows, fetchedAt: hit.fetchedAt || null, cached: true };
             }
-            const body = (await http.get(endpoint(settings, 'seriesSearch'), { params: { q }, endpoint: 'seriesSearch', timeoutKind: 'search' })).data;
+            const params = limit === null ? { q } : { q, limit };
+            const body = (await http.get(endpoint(settings, 'seriesSearch'), { params, endpoint: 'seriesSearch', timeoutKind: 'search' })).data;
             // An answer with no result list is unreadable, never "no candidates" (A25).
             if (!body || !Array.isArray(body.data)) throw new PluginError('source_error', `MangaBaka answered no search results for '${q}'`);
             const rows = body.data;

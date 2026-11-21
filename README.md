@@ -5,9 +5,14 @@
 [![download-runtime-zip](https://img.shields.io/badge/download-runtime_zip-0969da?logo=github)](https://github.com/dcostaz/manga-list-mangabaka/releases/download/runtime-latest/manga-list-mangabaka-runtime.zip)
 
 The manga-list tracker plugin for [MangaBaka](https://mangabaka.org), a manga metadata aggregator with a personal
-library API. Contract **4.3.0** (`docs/plugins/host-capability-contract.md` in the host repo), built on
+library API. Contract **4.4.0** (`docs/plugins/host-capability-contract.md` in the host repo), built on
 `@manga-list/plugin-sdk` in the template's shape (`Plan-2026Q4-tracker-plugin-standardization.md`, Phase 4; the sync
 refactor's amendments A27–A30, `Plan-2026Q4-sync-refactor.md`).
+
+4.4.0 (§2.4.1, `Plan-2026Q4-interface-refactor-tracker-search.md`) adds what Tracker Search shows: each search
+candidate carries its record (`detail`, A32), `lookup` answers the display part (`display`, A33), a cancelled series is
+`cancelled` (A34), and a search with `options.allHits` asks for every hit up to the `search.resultCap` setting (A35,
+A36). Every candidate is an entry `lookup` resolves (A38).
 
 Settings reference: [docs/settings.md](docs/settings.md). What happened to each 3.x method:
 [docs/nothing-lost.md](docs/nothing-lost.md).
@@ -50,6 +55,14 @@ in the 3.x tests (2026-08-24/27):
 - **A removal** (`unsubscribe`, A29) is that `DELETE`: the library is the account's one list and the whole of what the
   list read returns, so a removed series is on none of the user's lists (live-confirmed 2026-08-27: gone from the list
   afterwards). The list read is never cached.
+- **Search** (`GET /v1/series/search?q=…`, public, 30 requests a minute): every hit is the full series record, the
+  same one `GET /v1/series/{id}` answers, so a candidate's `detail` and `lookup`'s `display` come from one mapping:
+  titles with their language and kind, the description, the cover's sizes (`x150`/`x250`/`x350` are max heights,
+  api.json) and its blurhash, content rating, original language, status as worded, dates, final volume and chapter
+  total, tags with their path and spoiler flag, MangaBaka's rating and each site's 0–100 normalized one, rank,
+  licensing and anime, relations and typed links. A field the record does not hold is absent. Without `allHits` the
+  request sends `q` alone, the source's own page, as before; with it, `limit` set to the result cap (the live reads of
+  2026-11-19 sent `limit` and the answer echoed it). The two answers are cached under different keys.
 - **An unreadable answer** (a library page, a library entry, a series or a search answer with no `data`) is
   `source_error`, never an empty or short list, "not on the library" or `not_found` (A25).
 
@@ -73,4 +86,4 @@ ENABLE_REAL_LIBRARY_TEST=1 MB_TEST_API_KEY=mb-... npm run test:integration
 ```
 
 `@manga-list/plugin-sdk` is a devDependency pinned to the contract's tag
-(`git+https://github.com/dcostaz/manga-list-plugin-sdk.git#v4.3.0`).
+(`git+https://github.com/dcostaz/manga-list-plugin-sdk.git#v4.4.0`).

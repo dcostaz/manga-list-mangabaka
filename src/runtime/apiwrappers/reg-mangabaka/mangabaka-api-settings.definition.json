@@ -361,6 +361,20 @@
       "category": "performance",
       "order": 340
     },
+    "search.resultCap": {
+      "type": "number",
+      "required": true,
+      "default": 25,
+      "description": "How many results MangaBaka gives when Tracker Search asks for every match",
+      "validation": {
+        "min": 1,
+        "max": 25
+      },
+      "readOnly": false,
+      "isBasic": true,
+      "category": "performance",
+      "order": 555
+    },
     "cache.ttl.seriesMetadata": {
       "type": "number",
       "required": true,

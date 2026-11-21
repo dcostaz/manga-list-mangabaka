@@ -215,3 +215,51 @@ test('an HTML answer from MangaBaka\'s edge is a typed error, not parsed', () =>
     );
     assert.doesNotThrow(() => htmlNormalizer({ status: 200, headers: { 'content-type': 'application/json' }, data: { ok: true } }));
 });
+
+test('search with allHits (A35, A36) asks MangaBaka for the result cap as its limit and answers every hit; without it, q alone as before', async () => {
+    const { instance, axios } = await plugin();
+    const system = callContext({ credential: null, identity: 'system-slot', scope: 'system' });
+    const filtered = await instance.search('Series 1', undefined, system);
+    const every = await instance.search('Series 1', { allHits: true }, system);
+    const calls = axios.calls.filter((c) => c.url === `${BASE}/series/search`);
+    assert.deepEqual(calls.map((c) => c.params), [{ q: 'Series 1' }, { q: 'Series 1', limit: 25 }], 'the default cap is 25; the filtered call sends no limit');
+    assert.deepEqual([filtered.length, every.length], [2, 3], 'allHits answers more than the source\'s own page');
+    assert.deepEqual(every.map((/** @type {any} */ c) => c.detail.seriesStatus), ['ongoing', 'cancelled', 'completed']);
+});
+
+test('search with allHits: the configured search.resultCap is the limit', async () => {
+    const settings = { ...values, 'search.resultCap': 1, 'retry.maxAttempts': 2, 'rateLimit.perEndpoint.defaultDelay': 0 };
+    for (const key of Object.keys(settings)) if (key.endsWith('.throttle')) settings[key] = 0;
+    const axios = createStubAxios(sourceHandler);
+    const instance = await descriptor.WrapperClass.init({ context: createStubContext({ axios }), serviceSettings: settings });
+    const every = await instance.search('Series 1', { allHits: true }, user());
+    assert.equal(axios.calls.find((c) => c.url === `${BASE}/series/search`).params.limit, 1);
+    assert.equal(every.length, 1);
+});
+
+test('search: the cache is keyed on the limit, so a filtered answer is never reused as an allHits one, nor the reverse', async () => {
+    const { instance, axios } = await plugin();
+    const system = callContext({ credential: null, identity: 'system-slot', scope: 'system' });
+    const searchCalls = () => axios.calls.filter((c) => c.url === `${BASE}/series/search`).length;
+    await instance.search('Series 1', undefined, system);
+    const every = await instance.search('Series 1', { allHits: true }, system);
+    assert.equal(searchCalls(), 2, 'the filtered answer in the cache does not answer allHits');
+    assert.equal(every[0].cached, undefined);
+    assert.equal(every.length, 3);
+    const everyAgain = await instance.search('Series 1', { allHits: true }, system);
+    const filteredAgain = await instance.search('Series 1', undefined, system);
+    assert.equal(searchCalls(), 2, 'each repeat is answered from its own cache entry');
+    assert.deepEqual([everyAgain.length, everyAgain[0].cached, filteredAgain.length, filteredAgain[0].cached], [3, true, 2, true]);
+    await instance.search('Series 1', { allHits: true, refresh: true }, system);
+    assert.equal(searchCalls(), 3, 'refresh asks MangaBaka again with allHits too');
+});
+
+test('lookup (A33, A38): every search candidate resolves, with the display part of its series read', async () => {
+    const { instance } = await plugin();
+    const every = await instance.search('Series 1', { allHits: true }, user());
+    for (const candidate of every) {
+        const detail = await instance.lookup(candidate.pluginEntryId, user());
+        assert.equal(detail.pluginEntryId, candidate.pluginEntryId);
+        assert.deepEqual(detail.display, candidate.detail.display);
+    }
+});

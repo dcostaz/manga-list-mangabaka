@@ -67,6 +67,7 @@
     "retry.backoff.initialDelay": 1000,
     "retry.backoff.maxDelay": 10000,
     "retry.backoff.multiplier": 2,
+    "search.resultCap": 25,
     "cache.ttl.seriesMetadata": 86400,
     "cache.ttl.searchResults": 3600,
     "cache.ttl.coverUrls": 604800,

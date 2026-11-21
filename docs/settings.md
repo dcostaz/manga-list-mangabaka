@@ -84,6 +84,14 @@ responses exempt. `rateLimit.global.maxPerMinute` defaults to 170 (a safety marg
 
 ---
 
+## Search
+
+| Key | Default | Range | Order | Description |
+|-----|---------|-------|-------|-------------|
+| `search.resultCap` | `25` | 1–25 | 555 | How many results MangaBaka gives when Tracker Search asks for every match (`options.allHits`, contract §2.4.1, A36): sent as the search request's `limit`. `readOnly=false`, `isBasic=true`, `category=performance`. Every other search sends no `limit` and receives MangaBaka's own page, as before. |
+
+---
+
 ## Status Vocabulary
 
 The manifest's `syncOptions.statusVocabulary` has two tables (contract §2.2). `push` maps every host status to
